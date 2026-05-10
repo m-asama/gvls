@@ -1,0 +1,31 @@
+[package]
+name = "gvls-vtep"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+libgvls = { path = "../libgvls" }
+tokio = { version = "1.51.1", features = ["rt-multi-thread", "process", "net", "sync", "macros"] }
+serde = { version = "1.0.228", features = ["derive"] }
+rustls = "0.23.37"
+tokio-rustls = "0.26.4"
+remoc = "0.18.3"
+futures-util = "0.3.32"
+rtnetlink = "0.21.0"
+netlink-packet-route = "0.30.0"
+netlink-packet-core = "0.8.1"
+
+[package.metadata.deb]
+maintainer = "Masakazu Asama <masakazu.asama@gmail.com>"
+copyright = "2026, Masakazu Asama <masakazu.asama@gmail.com>"
+license-file = ["LICENSE", "4"]
+extended-description = "GVLS VTEP server"
+depends = "$auto"
+section = "admin"
+priority = "optional"
+maintainer-scripts = "debian/"
+systemd-units = { enable = false }
+assets = [
+    ["target/release/gvls-vtep", "usr/sbin/", "755"],
+    ["assets/default", "etc/default/gvls-vtep", "644"],
+]

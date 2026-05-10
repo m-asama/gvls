@@ -1,0 +1,12 @@
+[Unit]
+Description=gvls-rr
+After=network.target
+
+[Service]
+EnvironmentFile=-/etc/default/gvls-rr
+Type=simple
+ExecStart=/usr/sbin/gvls-rr --src-ifname $GVLS_RR_SRC_IFNAME --ui-addr $GVLS_RR_UI_ADDR --ui-port $GVLS_RR_UI_PORT --rch-addr $GVLS_RR_RCH_ADDR --rch-port $GVLS_RR_RCH_PORT $GVLS_RR_OPTS
+
+[Install]
+WantedBy=multi-user.target
+Alias=gvls-rr.service

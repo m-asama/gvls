@@ -1,0 +1,39 @@
+[package]
+name = "gvls-ui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+libgvls = { path = "../libgvls" }
+tokio = { version = "1.0", features = ["rt-multi-thread", "macros"] }
+tokio-stream = "0.1"
+tokio-postgres = "0.7.17"
+async-session = "3.0.0"
+askama = { version = "0.15.6", default-features = false, features = ["std", "derive"] }
+serde = { version = "1.0.228", features = ["derive"] }
+argon2 = "0.5.3"
+http = "1.4.0"
+axum = "0.8.8"
+axum-extra = { version = "0.12.6", features = ["form", "typed-header"] }
+tower = { version = "0.5.3", features = ["util"] }
+tower-http = { version = "0.6.8", features = ["fs", "trace"] }
+remoc = "0.18.3"
+
+[package.metadata.deb]
+maintainer = "Masakazu Asama <masakazu.asama@gmail.com>"
+copyright = "2026, Masakazu Asama <masakazu.asama@gmail.com>"
+license-file = ["LICENSE", "4"]
+extended-description = "gvls-ui"
+depends = "$auto"
+section = "admin"
+priority = "optional"
+maintainer-scripts = "debian/"
+systemd-units = { enable = false }
+assets = [
+    ["target/release/gvls-ui", "usr/sbin/", "755"],
+    ["assets/default", "etc/default/gvls-ui", "644"],
+    ["assets/gvls.sql", "usr/share/doc/gvls-ui/gvls.sql", "644"],
+    ["public/css/oat.min.css", "usr/share/doc/gvls-ui/public/css/oat.min.css", "644"],
+    ["public/js/oat.min.js", "usr/share/doc/gvls-ui/public/js/oat.min.js", "644"],
+    ["public/img/ginzado_logo.png", "usr/share/doc/gvls-ui/public/img/ginzado_logo.png", "644"],
+]

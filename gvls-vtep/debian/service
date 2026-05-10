@@ -1,0 +1,12 @@
+[Unit]
+Description=gvls-vtep
+After=network.target
+
+[Service]
+EnvironmentFile=-/etc/default/gvls-vtep
+Type=simple
+ExecStart=/usr/sbin/gvls-vtep --src-ifname $SRC_IFNAME --rr1-host $RR1_HOST --rr1-port $RR1_PORT --rr2-host $RR2_HOST --rr2-port $RR2_PORT $GVLS_VTEP_OPTS
+
+[Install]
+WantedBy=multi-user.target
+Alias=gvls-vtep.service

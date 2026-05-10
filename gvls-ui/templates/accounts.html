@@ -1,0 +1,69 @@
+{% extends "_layout.html" %}
+
+{%- block title -%}
+Accounts - 銀座堂仮想 LAN サービス
+{%- endblock -%}
+
+{%- block content -%}
+<section class="vstack">
+  <h1>Accounts</h1>
+{%- if message != "" -%}
+  <article class="danger">{{ message }}</article>
+{%- endif -%}
+
+  <form method="post" class="card vstack">
+    <input type="hidden" name="action" value="create">
+    <h3>Create account</h3>
+    <label>Email <input name="mail_addr" type="email" required></label>
+    <label>Password <input name="password" type="password" required></label>
+    <label>Permission
+      <select name="perm">
+        <option value="2">Free</option>
+        <option value="3">Pro</option>
+        <option value="1">Admin</option>
+      </select>
+    </label>
+    <div><button type="submit">Create</button></div>
+  </form>
+
+  <div class="table">
+    <table>
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Permission</th>
+          <th>Owned VNIs</th>
+          <th>Owned VTEPs</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+{%- for row in rows -%}
+        <form method="post">
+          <input type="hidden" name="account_id" value="{{ row.id }}">
+          <tr>
+            <td>{{ row.mail_addr }}</td>
+            <td>
+{%-   if row.can_change_perm -%}
+              <select name="perm">
+                <option value="2" {% if row.perm_code == 2 %}selected{% endif %}>Free</option>
+                <option value="3" {% if row.perm_code == 3 %}selected{% endif %}>Pro</option>
+              </select>
+{%-   else -%}
+              {{ row.perm_label }}
+{%-   endif -%}
+            </td>
+            <td>{{ row.vni_count }}</td>
+            <td>{{ row.vtep_count }}</td>
+            <td  align="right">
+              <button type="submit" name="action" value="save">Save</button>
+              <button type="submit" name="action" value="delete" class="outline">Delete</button>
+            </td>
+          </tr>
+        </form>
+{%- endfor -%}
+      </tbody>
+    </table>
+  </div>
+</section>
+{%- endblock -%}

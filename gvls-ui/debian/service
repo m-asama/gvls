@@ -1,0 +1,13 @@
+[Unit]
+Description=gvls-ui
+After=network.target postgresql.service
+
+[Service]
+WorkingDirectory=/usr/share/doc/gvls-ui
+EnvironmentFile=-/etc/default/gvls-ui
+Type=simple
+ExecStart=/usr/sbin/gvls-ui --http-addr $GVLS_UI_HTTP_ADDR --http-port $GVLS_UI_HTTP_PORT --rch-addr $GVLS_UI_RCH_ADDR --rch-port $GVLS_UI_RCH_PORT
+
+[Install]
+WantedBy=multi-user.target
+Alias=gvls-ui.service

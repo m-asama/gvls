@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}{% endblock %}</title>
+  <link rel="stylesheet" href="/css/oat.min.css">
+  <script src="/js/oat.min.js" defer></script>
+  <style>
+    .vtep { margin-right: 1em; }
+    .vni { margin-right: 1em; }
+  </style>
+</head>
+<body>
+  <nav data-topnav>
+    <div class="row">
+      <div class="col-4 branding">
+        <a href="/"><img src="/img/ginzado_logo.png" height="24" alt="Ginzado"></a>
+      </div>
+      <div class="col-8 justify-end hstack">
+{%- if auth == Authority::Anonymous -%}
+        <a href="/">Home</a>
+        <a href="/signin">Sign in</a>
+        <a href="/signup">Sign up</a>
+{%- endif -%}
+{%- if auth == Authority::Admin -%}
+        <a href="/">Home</a>
+        <a href="/accounts">Accounts</a>
+        <a href="/vnis">VNIs</a>
+        <a href="/vteps">VTEPs</a>
+        <a href="/setting">Setting</a>
+        <a href="/signout">Sign out</a>
+{%- endif -%}
+{%- if auth == Authority::Free || auth == Authority::Pro -%}
+        <a href="/">Home</a>
+        <a href="/vnis">VNIs</a>
+        <a href="/vteps">VTEPs</a>
+        <a href="/setting">Setting</a>
+        <a href="/signout">Sign out</a>
+{%- endif -%}
+      </div>
+    </div>
+  </nav>
+  <main>
+    <div class="container">
+{% block content %}{% endblock %}
+    </div>
+  </main>
+</body>
+</html>

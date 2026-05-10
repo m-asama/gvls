@@ -1,0 +1,21 @@
+{% extends "_layout.html" %}
+
+{%- block title -%}
+Sign in - 銀座堂仮想 LAN サービス
+{%- endblock -%}
+
+{%- block content -%}
+<section class="vstack">
+  <h1>Sign in</h1>
+{%- if error != "" -%}
+  <article class="danger">{{ error }}</article>
+{%- endif -%}
+  <form method="post" class="card vstack">
+    <label>Email <input name="mail_addr" type="email" required></label>
+    <label>Password <input name="password" type="password" required></label>
+    <div>
+      <button type="submit">Sign in</button>
+    </div>
+  </form>
+</section>
+{%- endblock -%}
