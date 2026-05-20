@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 use libgvls::{BgpOps, BgpOpsFrr, BgpOpsZebraRs, RR_RCH_PORT};
 
-pub const DEFAULT_BGP_BACKEND: BgpOps = BgpOps::Frr(BgpOpsFrr {});
+pub const DEFAULT_BGP_BACKEND: BgpOps = BgpOps::ZebraRs(BgpOpsZebraRs {});
 pub const DEFAULT_BGP_ASNUM: u32 = 64512;
 
 pub fn usage() {

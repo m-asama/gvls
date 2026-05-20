@@ -148,7 +148,7 @@ impl Context {
             self.loc_addr, msg.loc_addr
         );
         for (vni, ifname) in &self.vnis {
-            if let Err(e) = update_vni(*vni, &msg.loc_addr).await {
+            if let Err(e) = update_vni(*vni, &self.loc_addr, &msg.loc_addr).await {
                 println!("Update VNI {vni}:{ifname} failed: {e}");
             }
         }
@@ -247,6 +247,10 @@ impl Context {
     }
 
     pub async fn run(&mut self) {
+        if let Err(e) = self.bgp_ops.wait().await {
+            println!("Waiting BGP backend error: {e}");
+            return;
+        }
         if let Err(e) = self.init_src_ifindex().await {
             println!("Get source interface index failed: {e}");
             return;

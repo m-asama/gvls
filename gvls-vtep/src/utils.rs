@@ -3,188 +3,91 @@
 
 use std::net::Ipv6Addr;
 
-use tokio::process::Command;
+use libgvls::{BgpOps, exec, is_bridge, link_exists, sysctl};
 
-use libgvls::{BgpOps, is_bridge, is_vxlan, link_exists};
+fn brname(vni: u32) -> String {
+    format!("gvls-br{vni}")
+}
+
+fn vniname(vni: u32) -> String {
+    format!("gvls-vni{vni}")
+}
 
 pub async fn init_vni(vni: u32, ifname: &str, local: &Option<Ipv6Addr>) -> Result<(), String> {
     if !link_exists(ifname).await {
         return Err(format!("Link {ifname} not exists"));
     }
-    let brname = format!("br{vni}");
-    let vniname = format!("vni{vni}");
-    let vnistr = format!("{vni}");
-    let localstr = if let Some(local) = local {
-        format!("{local}")
-    } else {
-        let l1 = format!("{:02x}", vni >> 16);
-        let l2 = format!("{:x}", vni & 0xffffu32);
-        format!("::ffff:7f{l1}:{l2}")
-    };
+
+    let brname = brname(vni);
+    let vniname = vniname(vni);
+
+    // br setup
     if !link_exists(&brname).await {
-        if let Err(e) = Command::new("ip")
-            .arg("link")
-            .arg("add")
-            .arg(&brname)
-            .arg("type")
-            .arg("bridge")
-            .output()
-            .await
-        {
-            println!("ip link add {brname} error: {e}");
-        }
-        if let Err(e) = Command::new("ip")
-            .arg("link")
-            .arg("set")
-            .arg(&brname)
-            .arg("addrgenmode")
-            .arg("none")
-            .output()
-            .await
-        {
-            println!("ip link set {brname} addrgenmode none error: {e}");
-        }
+        exec(vec!["ip", "link", "add", &brname, "type", "bridge"]).await;
+        exec(vec!["ip", "link", "set", &brname, "addrgenmode", "none"]).await;
     }
     if !is_bridge(&brname).await {
         return Err(format!("Link {brname} is not bridge"));
     }
-    if let Err(e) = Command::new("ip")
-        .arg("link")
-        .arg("set")
-        .arg(&brname)
-        .arg("up")
-        .output()
-        .await
-    {
-        println!("ip link set {brname} up error: {e}");
+    exec(vec!["ip", "link", "set", &brname, "up"]).await;
+    sysctl(&format!("net.ipv4.conf.{brname}.forwarding=0")).await;
+    sysctl(&format!("net.ipv6.conf.{brname}.forwarding=0")).await;
+
+    // vni setup
+    if link_exists(&vniname).await {
+        exec(vec!["ip", "link", "delete", &vniname]).await;
     }
-    if let Err(e) = Command::new("sysctl")
-        .arg("-w")
-        .arg(&format!("net.ipv4.conf.{brname}.forwarding=0"))
-        .output()
-        .await
-    {
-        println!("sysctl {brname} IPv4 forward disable error: {e}");
+    if let Err(e) = update_vni(vni, &None, local).await {
+        return Err(format!("Init {vni} error: {e}"));
     }
-    if let Err(e) = Command::new("sysctl")
-        .arg("-w")
-        .arg(&format!("net.ipv6.conf.{brname}.forwarding=0"))
-        .output()
-        .await
-    {
-        println!("sysctl {brname} IPv6 forward disable error: {e}");
-    }
-    if !link_exists(&vniname).await {
-        if let Err(e) = Command::new("ip")
-            .arg("link")
-            .arg("add")
-            .arg(&vniname)
-            .arg("type")
-            .arg("vxlan")
-            .arg("local")
-            .arg(&localstr)
-            .arg("dstport")
-            .arg("4789")
-            .arg("id")
-            .arg(&vnistr)
-            .arg("nolearning")
-            .output()
-            .await
-        {
-            println!("ip link add {vniname} error: {e}");
-        }
-        if let Err(e) = Command::new("ip")
-            .arg("link")
-            .arg("set")
-            .arg(&vniname)
-            .arg("master")
-            .arg(&brname)
-            .arg("addrgenmode")
-            .arg("none")
-            .output()
-            .await
-        {
-            println!("ip link set {vniname} master {brname} error: {e}");
-        }
-        if let Err(e) = Command::new("ip")
-            .arg("link")
-            .arg("set")
-            .arg(&vniname)
-            .arg("type")
-            .arg("bridge_slave")
-            .arg("neigh_suppress")
-            .arg("on")
-            .arg("learning")
-            .arg("off")
-            .output()
-            .await
-        {
-            println!("ip link add {vniname} error: {e}");
-        }
-    }
-    if !is_vxlan(&vniname).await {
-        return Err(format!("Link {vniname} is not vxlan"));
-    }
-    if let Err(e) = Command::new("ip")
-        .arg("link")
-        .arg("set")
-        .arg(&vniname)
-        .arg("up")
-        .output()
-        .await
-    {
-        println!("ip link set {vniname} up error: {e}");
-    }
-    if let Err(e) = Command::new("ip")
-        .arg("link")
-        .arg("set")
-        .arg(ifname)
-        .arg("up")
-        .output()
-        .await
-    {
-        println!("ip link set {ifname} up error: {e}");
-    }
-    if let Err(e) = Command::new("ip")
-        .arg("link")
-        .arg("set")
-        .arg(ifname)
-        .arg("master")
-        .arg(&brname)
-        .output()
-        .await
-    {
-        println!("ip link set {ifname} master {brname} error: {e}");
-    }
+
+    // brport setup
+    exec(vec!["ip", "link", "set", ifname, "up"]).await;
+    exec(vec!["ip", "link", "set", ifname, "master", &brname]).await;
 
     Ok(())
 }
 
-pub async fn update_vni(vni: u32, local: &Option<Ipv6Addr>) -> Result<(), String> {
-    println!("Update VNI {vni}: local={local:?}");
-    let vniname = format!("vni{vni}");
-    let localstr = if let Some(local) = local {
-        format!("{local}")
-    } else {
-        let l1 = format!("{:02x}", vni >> 16);
-        let l2 = format!("{:x}", vni & 0xffffu32);
-        format!("::ffff:7f{l1}:{l2}")
-    };
-    if !link_exists(&vniname).await {
-        return Err(format!("Link {vniname} not exists"));
+pub async fn update_vni(
+    vni: u32,
+    loc_current: &Option<Ipv6Addr>,
+    loc_next: &Option<Ipv6Addr>,
+) -> Result<(), String> {
+    println!("Update VNI {vni}: local {:?}->{:?}", loc_current, loc_next);
+    let brname = brname(vni);
+    let vniname = vniname(vni);
+    if loc_next.is_none() || loc_next != loc_current {
+        exec(vec!["ip", "link", "delete", &vniname]).await;
     }
-    if let Err(e) = Command::new("ip")
-        .arg("link")
-        .arg("change")
-        .arg(&vniname)
-        .arg("type")
-        .arg("vxlan")
-        .arg("local")
-        .arg(&localstr)
-        .output()
-        .await
+    if let Some(local) = loc_next
+        && loc_next != loc_current
     {
-        println!("ip link change {vniname} local {localstr} error: {e}");
+        exec(
+            [
+                vec!["ip", "link", "add", &vniname, "type", "vxlan"],
+                vec!["local", &format!("{local}"), "dstport", "4789"],
+                vec!["id", &format!("{vni}"), "nolearning"],
+            ]
+            .concat(),
+        )
+        .await;
+        exec(
+            [
+                vec!["ip", "link", "set", &vniname],
+                vec!["master", &brname, "addrgenmode", "none"],
+            ]
+            .concat(),
+        )
+        .await;
+        exec(
+            [
+                vec!["ip", "link", "set", &vniname, "type", "bridge_slave"],
+                vec!["neigh_suppress", "on", "learning", "off"],
+            ]
+            .concat(),
+        )
+        .await;
+        exec(vec!["ip", "link", "set", &vniname, "up"]).await;
     }
     Ok(())
 }
@@ -243,46 +146,23 @@ pub async fn update_bgp(
 }
 
 pub async fn init_neighs() -> Result<(), String> {
-    if let Err(e) = Command::new("ipset")
-        .arg("create")
-        .arg("gvls-neighs")
-        .arg("hash:net")
-        .arg("family")
-        .arg("inet6")
-        .arg("hashsize")
-        .arg("1024")
-        .arg("maxelem")
-        .arg("65536")
-        .output()
-        .await
-    {
-        println!("ipset init error: {e}");
-    }
+    exec(
+        [
+            vec!["ipset", "create", "gvls-neighs", "hash:net"],
+            vec!["family", "inet6", "hashsize", "1024", "maxelem", "65536"],
+        ]
+        .concat(),
+    )
+    .await;
     Ok(())
 }
 
 pub async fn add_neigh(neigh: &Ipv6Addr) -> Result<(), String> {
-    if let Err(e) = Command::new("ipset")
-        .arg("add")
-        .arg("gvls-neighs")
-        .arg(format!("{neigh}"))
-        .output()
-        .await
-    {
-        println!("ipset add {neigh} error: {e}");
-    }
+    exec(vec!["ipset", "add", "gvls-neighs", &format!("{neigh}")]).await;
     Ok(())
 }
 
 pub async fn del_neigh(neigh: &Ipv6Addr) -> Result<(), String> {
-    if let Err(e) = Command::new("ipset")
-        .arg("del")
-        .arg("gvls-neighs")
-        .arg(format!("{neigh}"))
-        .output()
-        .await
-    {
-        println!("ipset del {neigh} error: {e}");
-    }
+    exec(vec!["ipset", "del", "gvls-neighs", &format!("{neigh}")]).await;
     Ok(())
 }

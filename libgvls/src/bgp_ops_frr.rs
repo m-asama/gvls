@@ -3,8 +3,10 @@
 
 use std::collections::HashSet;
 use std::net::Ipv6Addr;
+use std::time::Duration;
 
 use tokio::process::Command;
+use tokio::time::sleep;
 
 const ROUTE_MAP_PREFIX: &str = "gvlm-rm";
 
@@ -204,5 +206,22 @@ impl BgpOpsFrr {
         {
             println!("Init BGP error: {e}");
         }
+    }
+
+    pub async fn wait(&self) -> Result<(), String> {
+        for _ in 0..60 {
+            if let Ok(status) = Command::new("vtysh")
+                .arg("-c")
+                .arg("show version")
+                .status()
+                .await
+            {
+                if status.success() {
+                    return Ok(());
+                }
+            }
+            sleep(Duration::from_secs(1)).await;
+        }
+        Err(format!("Waiting frr timed out"))
     }
 }

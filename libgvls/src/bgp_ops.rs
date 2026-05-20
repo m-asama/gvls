@@ -87,4 +87,11 @@ impl BgpOps {
             BgpOps::ZebraRs(bgp_ops) => bgp_ops.init(asnum).await,
         }
     }
+
+    pub async fn wait(&self) -> Result<(), String> {
+        match self {
+            BgpOps::Frr(bgp_ops) => bgp_ops.wait().await,
+            BgpOps::ZebraRs(bgp_ops) => bgp_ops.wait().await,
+        }
+    }
 }
