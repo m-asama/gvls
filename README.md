@@ -4,7 +4,7 @@
 
 銀座堂仮想 LAN サービス ( https://gvls.ginzado.ne.jp/ ) は EVPN/VXLAN による L2VPN をフレッツ閉域 IPv6 網で簡単に構築することができるサービスです。
 
-<img src="figures/figures.001.png" width="50%">
+![図](figures/figures.001.png)
 
 このリポジトリでは銀座堂仮想 LAN サービスを構成するための以下のソフトウェアのソースコードをメンテナンスしています。
 
