@@ -34,8 +34,6 @@ pub struct Context {
     //
     tx_lch: mpsc::Sender<VtepLchMsg>,
     rx_lch: mpsc::Receiver<VtepLchMsg>,
-    tx_rr_lch: mpsc::Sender<RrLchMsg>,
-    rx_rr_lch: mpsc::Receiver<RrLchMsg>,
     rr_tx_lchs: [Option<mpsc::Sender<RrLchMsg>>; 2],
 }
 
@@ -48,7 +46,6 @@ impl Context {
             return Err(format!("GVLS_VTEP_PASS required"));
         }
         let (tx_lch, rx_lch) = mpsc::channel(1);
-        let (tx_rr_lch, rx_rr_lch) = mpsc::channel(1);
         Ok(Self {
             vtep_name: conf.vtep_name,
             vtep_pass: conf.vtep_pass,
@@ -68,8 +65,6 @@ impl Context {
             //
             tx_lch,
             rx_lch,
-            tx_rr_lch,
-            rx_rr_lch,
             rr_tx_lchs: [None, None],
         })
     }
@@ -228,21 +223,11 @@ impl Context {
 
     async fn lch(&mut self, msg: Option<VtepLchMsg>) -> Result<(), String> {
         match msg {
+            Some(VtepLchMsg::VtepRegistered(msg)) => self.vtep_registered(msg).await,
             Some(VtepLchMsg::LocAddrChanged(msg)) => self.loc_addr_changed(msg).await,
+            Some(VtepLchMsg::RemAddrChanged(msg)) => self.rem_addr_changed(msg).await,
+            Some(VtepLchMsg::UpdateNeighs(msg)) => self.update_neighs(msg).await,
             None => Err(format!("Received none lch")),
-        }
-    }
-
-    async fn rr_lch(&mut self, msg: Option<RrLchMsg>) -> Result<(), String> {
-        match msg {
-            Some(RrLchMsg::VtepRegistered(msg)) => self.vtep_registered(msg).await,
-            Some(RrLchMsg::LocAddrChanged(_)) => {
-                println!("Unexpected LocAddrChanged received on context RR channel");
-                Ok(())
-            }
-            Some(RrLchMsg::RemAddrChanged(msg)) => self.rem_addr_changed(msg).await,
-            Some(RrLchMsg::UpdateNeighs(msg)) => self.update_neighs(msg).await,
-            None => Err(format!("Received none rr lch")),
         }
     }
 
@@ -280,7 +265,7 @@ impl Context {
                 i,
                 self.rr_hosts[i].clone(),
                 self.rr_ports[i],
-                self.tx_rr_lch.clone(),
+                self.tx_lch.clone(),
                 rr_rx_lch,
             );
             tokio::spawn(async move {
@@ -293,12 +278,6 @@ impl Context {
                 msg = self.rx_lch.recv() => {
                     if let Err(e) = self.lch(msg).await {
                         println!("lch error: {e}");
-                        break;
-                    }
-                }
-                msg = self.rx_rr_lch.recv() => {
-                    if let Err(e) = self.rr_lch(msg).await {
-                        println!("rr lch error: {e}");
                         break;
                     }
                 }

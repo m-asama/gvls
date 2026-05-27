@@ -30,13 +30,13 @@ pub struct UpdateNeighsMsg {
 
 #[derive(Debug, Clone)]
 pub enum VtepLchMsg {
-    LocAddrChanged(LocAddrChangedMsg),
-}
-
-#[derive(Debug, Clone)]
-pub enum RrLchMsg {
     VtepRegistered(VtepRegisteredMsg),
     LocAddrChanged(LocAddrChangedMsg),
     RemAddrChanged(RemAddrChangedMsg),
     UpdateNeighs(UpdateNeighsMsg),
+}
+
+#[derive(Debug, Clone)]
+pub enum RrLchMsg {
+    LocAddrChanged(LocAddrChangedMsg),
 }

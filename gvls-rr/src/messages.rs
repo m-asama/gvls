@@ -80,22 +80,21 @@ pub struct ModVtepVniMsg {
 #[derive(Debug)]
 pub enum RrLchMsg {
     LocAddrChanged(LocAddrChangedMsg),
-}
-
-#[derive(Debug)]
-pub enum UiLchMsg {
     RrRegistered(RrRegisteredMsg),
     AddVtep(AddVtepMsg),
     DelVtep(DelVtepMsg),
     AddVni(AddVniMsg),
     DelVni(DelVniMsg),
     ModVtepVni(ModVtepVniMsg),
+    AuthVtep(AuthVtepReq),
+    VtepRegistered(VtepRegisteredMsg),
+    VtepExit(VtepExitMsg),
 }
 
 #[derive(Debug)]
+pub enum UiLchMsg {}
+
+#[derive(Debug)]
 pub enum VtepLchMsg {
-    AuthVtep(AuthVtepReq),
     UpdateNeighs(UpdateNeighsMsg),
-    VtepRegistered(VtepRegisteredMsg),
-    VtepExit(VtepExitMsg),
 }

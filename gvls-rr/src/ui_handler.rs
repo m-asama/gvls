@@ -15,7 +15,8 @@ use libgvls::{
 };
 
 use crate::{
-    AddVniMsg, AddVtepMsg, DelVniMsg, DelVtepMsg, ModVtepVniMsg, RrRegisteredMsg, UiLchMsg,
+    AddVniMsg, AddVtepMsg, DelVniMsg, DelVtepMsg, ModVtepVniMsg, RrLchMsg, RrRegisteredMsg,
+    UiLchMsg,
 };
 
 pub struct UiHandler {
@@ -29,7 +30,8 @@ pub struct UiHandler {
     hello_last: Instant,
     tx_rch: Option<rch::base::Sender<UiRchMsg>>,
     rx_rch: Option<rch::base::Receiver<RrRchMsg>>,
-    tx_lch: mpsc::Sender<UiLchMsg>,
+    tx_lch: mpsc::Sender<RrLchMsg>,
+    rx_lch: mpsc::Receiver<UiLchMsg>,
 }
 
 impl UiHandler {
@@ -38,7 +40,8 @@ impl UiHandler {
         ui_port: u16,
         rr_name: String,
         rr_pass: String,
-        tx_lch: mpsc::Sender<UiLchMsg>,
+        tx_lch: mpsc::Sender<RrLchMsg>,
+        rx_lch: mpsc::Receiver<UiLchMsg>,
     ) -> Self {
         Self {
             ui_addr,
@@ -52,6 +55,7 @@ impl UiHandler {
             tx_rch: None,
             rx_rch: None,
             tx_lch,
+            rx_lch,
         }
     }
 
@@ -170,7 +174,7 @@ impl UiHandler {
         drop(rep);
 
         // RrRegistered
-        let msg = UiLchMsg::RrRegistered(RrRegisteredMsg { vteps, vnis });
+        let msg = RrLchMsg::RrRegistered(RrRegisteredMsg { vteps, vnis });
         if let Err(e) = self.tx_lch.send(msg).await {
             println!("Send RrRegistered to context failed: {e}");
             self.retry();
@@ -181,7 +185,7 @@ impl UiHandler {
     }
 
     async fn vtep_added(&mut self, msg: VtepAddedMsg) -> Result<(), String> {
-        let lmsg = UiLchMsg::AddVtep(AddVtepMsg { vtep: msg.vtep });
+        let lmsg = RrLchMsg::AddVtep(AddVtepMsg { vtep: msg.vtep });
         if let Err(e) = self.tx_lch.send(lmsg).await {
             println!("Send AddVtep error: {e}");
         }
@@ -189,7 +193,7 @@ impl UiHandler {
     }
 
     async fn vtep_deleted(&mut self, msg: VtepDeletedMsg) -> Result<(), String> {
-        let lmsg = UiLchMsg::DelVtep(DelVtepMsg { vtep: msg.vtep });
+        let lmsg = RrLchMsg::DelVtep(DelVtepMsg { vtep: msg.vtep });
         if let Err(e) = self.tx_lch.send(lmsg).await {
             println!("Send DelVtep error: {e}");
         }
@@ -197,7 +201,7 @@ impl UiHandler {
     }
 
     async fn vni_added(&mut self, msg: VniAddedMsg) -> Result<(), String> {
-        let lmsg = UiLchMsg::AddVni(AddVniMsg { vni: msg.vni });
+        let lmsg = RrLchMsg::AddVni(AddVniMsg { vni: msg.vni });
         if let Err(e) = self.tx_lch.send(lmsg).await {
             println!("Send AddVni error: {e}");
         }
@@ -205,7 +209,7 @@ impl UiHandler {
     }
 
     async fn vni_deleted(&mut self, msg: VniDeletedMsg) -> Result<(), String> {
-        let lmsg = UiLchMsg::DelVni(DelVniMsg { vni: msg.vni });
+        let lmsg = RrLchMsg::DelVni(DelVniMsg { vni: msg.vni });
         if let Err(e) = self.tx_lch.send(lmsg).await {
             println!("Send DelVni error: {e}");
         }
@@ -213,7 +217,7 @@ impl UiHandler {
     }
 
     async fn vtep_vni_modified(&mut self, msg: VtepVniModifiedMsg) -> Result<(), String> {
-        let lmsg = UiLchMsg::ModVtepVni(ModVtepVniMsg {
+        let lmsg = RrLchMsg::ModVtepVni(ModVtepVniMsg {
             vtep: msg.vtep,
             vni: msg.vni,
         });
@@ -247,6 +251,12 @@ impl UiHandler {
         }
     }
 
+    async fn lch(&mut self, msg: Option<UiLchMsg>) -> Result<(), String> {
+        match msg {
+            None => Err(format!("Received none lch")),
+        }
+    }
+
     pub async fn run(&mut self) {
         let mut timer = tokio::time::interval(Duration::from_secs(1));
         loop {
@@ -260,6 +270,12 @@ impl UiHandler {
                     if let Err(e) = self.rch(msg).await {
                         println!("rch error: {e}");
                         self.reset();
+                    }
+                },
+                msg = self.rx_lch.recv() => {
+                    if let Err(e) = self.lch(msg).await {
+                        println!("lch error: {e}");
+                        break;
                     }
                 },
                 _ = timer.tick() => {

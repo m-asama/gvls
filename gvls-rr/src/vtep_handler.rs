@@ -13,7 +13,7 @@ use libgvls::{
     VtepRchMsg,
 };
 
-use crate::{AuthVtepReq, UpdateNeighsMsg, VtepExitMsg, VtepLchMsg, VtepRegisteredMsg};
+use crate::{AuthVtepReq, RrLchMsg, UpdateNeighsMsg, VtepExitMsg, VtepLchMsg, VtepRegisteredMsg};
 
 pub struct VtepHandler {
     addr: Ipv6Addr,
@@ -23,7 +23,7 @@ pub struct VtepHandler {
     neighs_sent: HashSet<Ipv6Addr>,
     tx_rch: rch::base::Sender<VtepRchMsg>,
     rx_rch: rch::base::Receiver<RrRchMsg>,
-    tx_lch: mpsc::Sender<VtepLchMsg>,
+    tx_lch: mpsc::Sender<RrLchMsg>,
     rx_lch: mpsc::Receiver<VtepLchMsg>,
 }
 
@@ -32,7 +32,7 @@ impl VtepHandler {
         addr: Ipv6Addr,
         tx_rch: rch::base::Sender<VtepRchMsg>,
         rx_rch: rch::base::Receiver<RrRchMsg>,
-        tx_lch: mpsc::Sender<VtepLchMsg>,
+        tx_lch: mpsc::Sender<RrLchMsg>,
         rx_lch: mpsc::Receiver<VtepLchMsg>,
     ) -> Self {
         Self {
@@ -131,19 +131,7 @@ impl VtepHandler {
 
     async fn lch(&mut self, msg: Option<VtepLchMsg>) -> Result<(), String> {
         match msg {
-            Some(VtepLchMsg::AuthVtep(_)) => {
-                println!("Unexpected AuthVtep received by VTEP handler");
-                Ok(())
-            }
             Some(VtepLchMsg::UpdateNeighs(msg)) => self.update_neighs(msg).await,
-            Some(VtepLchMsg::VtepRegistered(_)) => {
-                println!("Unexpected VtepRegistered received by VTEP handler");
-                Ok(())
-            }
-            Some(VtepLchMsg::VtepExit(_)) => {
-                println!("Unexpected VtepExit received by VTEP handler");
-                Ok(())
-            }
             None => Err(format!("Received none lch")),
         }
     }
@@ -159,7 +147,7 @@ impl VtepHandler {
 
         // AuthVtepReq
         let (rep_tx, mut rep_rx) = mpsc::channel(1);
-        let lreq = VtepLchMsg::AuthVtep(AuthVtepReq {
+        let lreq = RrLchMsg::AuthVtep(AuthVtepReq {
             name: rreq.name,
             password: rreq.password,
             rem_addr: self.addr.clone(),
@@ -211,7 +199,7 @@ impl VtepHandler {
         self.neighs_sent = lrep.neighs;
 
         // VtepRegistered
-        let lmsg = VtepLchMsg::VtepRegistered(VtepRegisteredMsg {
+        let lmsg = RrLchMsg::VtepRegistered(VtepRegisteredMsg {
             name: self.name.clone(),
             rem_addr: self.addr.clone(),
         });
@@ -255,7 +243,7 @@ impl VtepHandler {
 
         // VtepExit
         println!("Sending VtepExit {} {}", self.name, self.addr);
-        let lmsg = VtepLchMsg::VtepExit(VtepExitMsg {
+        let lmsg = RrLchMsg::VtepExit(VtepExitMsg {
             name: self.name.clone(),
             rem_addr: self.addr.clone(),
         });

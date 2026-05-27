@@ -13,7 +13,9 @@ use libgvls::{
     VtepRchMsg, rch_connect_host,
 };
 
-use crate::{LocAddrChangedMsg, RemAddrChangedMsg, RrLchMsg, UpdateNeighsMsg, VtepRegisteredMsg};
+use crate::{
+    LocAddrChangedMsg, RemAddrChangedMsg, RrLchMsg, UpdateNeighsMsg, VtepLchMsg, VtepRegisteredMsg,
+};
 
 pub struct RrHandler {
     vtep_name: String,
@@ -28,7 +30,7 @@ pub struct RrHandler {
     hello_last: Instant,
     tx_rch: Option<rch::base::Sender<RrRchMsg>>,
     rx_rch: Option<rch::base::Receiver<VtepRchMsg>>,
-    tx_lch: mpsc::Sender<RrLchMsg>,
+    tx_lch: mpsc::Sender<VtepLchMsg>,
     rx_lch: mpsc::Receiver<RrLchMsg>,
 }
 
@@ -39,7 +41,7 @@ impl RrHandler {
         rr_index: usize,
         rr_host: String,
         rr_port: u16,
-        tx_lch: mpsc::Sender<RrLchMsg>,
+        tx_lch: mpsc::Sender<VtepLchMsg>,
         rx_lch: mpsc::Receiver<RrLchMsg>,
     ) -> Self {
         Self {
@@ -81,7 +83,7 @@ impl RrHandler {
     }
 
     async fn send_rem_addr_changed(&mut self, rem_addr: Option<Ipv6Addr>) {
-        let msg = RrLchMsg::RemAddrChanged(RemAddrChangedMsg {
+        let msg = VtepLchMsg::RemAddrChanged(RemAddrChangedMsg {
             rr_index: self.rr_index,
             rem_addr: rem_addr,
         });
@@ -182,7 +184,7 @@ impl RrHandler {
         drop(rep);
 
         // VtepRegistered
-        let msg = RrLchMsg::VtepRegistered(VtepRegisteredMsg {
+        let msg = VtepLchMsg::VtepRegistered(VtepRegisteredMsg {
             rr_index: self.rr_index,
             bgp_pass,
             neighs: neighs,
@@ -205,7 +207,7 @@ impl RrHandler {
         while let Ok(Some(neigh)) = msg.neigh_rx.recv().await {
             neighs.insert(neigh);
         }
-        let msg = RrLchMsg::UpdateNeighs(UpdateNeighsMsg {
+        let msg = VtepLchMsg::UpdateNeighs(UpdateNeighsMsg {
             rr_index: self.rr_index,
             neighs: neighs,
         });
@@ -247,19 +249,7 @@ impl RrHandler {
 
     async fn lch(&mut self, msg: Option<RrLchMsg>) -> Result<(), String> {
         match msg {
-            Some(RrLchMsg::VtepRegistered(_)) => {
-                println!("Unexpected VtepRegistered received by RR handler");
-                Ok(())
-            }
             Some(RrLchMsg::LocAddrChanged(msg)) => self.loc_addr_changed(msg).await,
-            Some(RrLchMsg::RemAddrChanged(_)) => {
-                println!("Unexpected RemAddrChanged received by RR handler");
-                Ok(())
-            }
-            Some(RrLchMsg::UpdateNeighs(_)) => {
-                println!("Unexpected UpdateNeighs received by RR handler");
-                Ok(())
-            }
             None => Err(format!("Received none lch")),
         }
     }

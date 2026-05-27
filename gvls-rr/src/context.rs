@@ -37,10 +37,7 @@ pub struct Context {
     //
     tx_lch: mpsc::Sender<RrLchMsg>,
     rx_lch: mpsc::Receiver<RrLchMsg>,
-    tx_ui_lch: mpsc::Sender<UiLchMsg>,
-    rx_ui_lch: mpsc::Receiver<UiLchMsg>,
-    tx_vtep_lch: mpsc::Sender<VtepLchMsg>,
-    rx_vtep_lch: mpsc::Receiver<VtepLchMsg>,
+    ui_tx_lch: Option<mpsc::Sender<UiLchMsg>>,
     vtep_tx_lchs: HashMap<Ipv6Addr, mpsc::Sender<VtepLchMsg>>,
 }
 
@@ -56,8 +53,6 @@ impl Context {
             return Err(format!("GVLS_RR_PASS required"));
         }
         let (tx_lch, rx_lch) = mpsc::channel(1);
-        let (tx_ui_lch, rx_ui_lch) = mpsc::channel(1);
-        let (tx_vtep_lch, rx_vtep_lch) = mpsc::channel(1);
         Ok(Self {
             rr_name: conf.rr_name,
             rr_pass: conf.rr_pass,
@@ -77,10 +72,7 @@ impl Context {
             //
             tx_lch,
             rx_lch,
-            tx_ui_lch,
-            rx_ui_lch,
-            tx_vtep_lch,
-            rx_vtep_lch,
+            ui_tx_lch: None,
             vtep_tx_lchs: HashMap::<Ipv6Addr, mpsc::Sender<VtepLchMsg>>::new(),
         })
     }
@@ -452,32 +444,16 @@ impl Context {
     async fn lch(&mut self, msg: Option<RrLchMsg>) -> Result<(), String> {
         match msg {
             Some(RrLchMsg::LocAddrChanged(msg)) => self.loc_addr_changed(msg).await,
+            Some(RrLchMsg::RrRegistered(msg)) => self.rr_registered(msg).await,
+            Some(RrLchMsg::AddVtep(msg)) => self.add_vtep(msg).await,
+            Some(RrLchMsg::DelVtep(msg)) => self.del_vtep(msg).await,
+            Some(RrLchMsg::AddVni(msg)) => self.add_vni(msg).await,
+            Some(RrLchMsg::DelVni(msg)) => self.del_vni(msg).await,
+            Some(RrLchMsg::ModVtepVni(msg)) => self.mod_vtep_vni(msg).await,
+            Some(RrLchMsg::AuthVtep(msg)) => self.auth_vtep(msg).await,
+            Some(RrLchMsg::VtepRegistered(msg)) => self.vtep_registered(msg).await,
+            Some(RrLchMsg::VtepExit(msg)) => self.vtep_exit(msg).await,
             None => Err(format!("Received none lch")),
-        }
-    }
-
-    async fn ui_lch(&mut self, msg: Option<UiLchMsg>) -> Result<(), String> {
-        match msg {
-            Some(UiLchMsg::RrRegistered(msg)) => self.rr_registered(msg).await,
-            Some(UiLchMsg::AddVtep(msg)) => self.add_vtep(msg).await,
-            Some(UiLchMsg::DelVtep(msg)) => self.del_vtep(msg).await,
-            Some(UiLchMsg::AddVni(msg)) => self.add_vni(msg).await,
-            Some(UiLchMsg::DelVni(msg)) => self.del_vni(msg).await,
-            Some(UiLchMsg::ModVtepVni(msg)) => self.mod_vtep_vni(msg).await,
-            None => Err(format!("Received none ui lch")),
-        }
-    }
-
-    async fn vtep_lch(&mut self, msg: Option<VtepLchMsg>) -> Result<(), String> {
-        match msg {
-            Some(VtepLchMsg::AuthVtep(msg)) => self.auth_vtep(msg).await,
-            Some(VtepLchMsg::UpdateNeighs(_)) => {
-                println!("Unexpected UpdateNeighs received on context VTEP channel");
-                Ok(())
-            }
-            Some(VtepLchMsg::VtepRegistered(msg)) => self.vtep_registered(msg).await,
-            Some(VtepLchMsg::VtepExit(msg)) => self.vtep_exit(msg).await,
-            None => Err(format!("Received none vtep lch")),
         }
     }
 
@@ -503,12 +479,15 @@ impl Context {
         });
 
         // UiHandler
+        let (ui_tx_lch, ui_rx_lch) = mpsc::channel(1);
+        self.ui_tx_lch = Some(ui_tx_lch);
         let mut ui_handler = UiHandler::new(
             self.ui_addr.clone(),
             self.ui_port,
             self.rr_name.clone(),
             self.rr_pass.clone(),
-            self.tx_ui_lch.clone(),
+            self.tx_lch.clone(),
+            ui_rx_lch,
         );
         tokio::spawn(async move {
             ui_handler.run().await;
@@ -535,7 +514,7 @@ impl Context {
                                 addr,
                                 tx_rch,
                                 rx_rch,
-                                self.tx_vtep_lch.clone(),
+                                self.tx_lch.clone(),
                                 vtep_rx_lch,
                             );
                             tokio::spawn(async move {
@@ -554,18 +533,6 @@ impl Context {
                 msg = self.rx_lch.recv() => {
                     if let Err(e) = self.lch(msg).await {
                         println!("lch error: {e}");
-                        break;
-                    }
-                }
-                msg = self.rx_ui_lch.recv() => {
-                    if let Err(e) = self.ui_lch(msg).await {
-                        println!("ui lch error: {e}");
-                        break;
-                    }
-                }
-                msg = self.rx_vtep_lch.recv() => {
-                    if let Err(e) = self.vtep_lch(msg).await {
-                        println!("vtep lch error: {e}");
                         break;
                     }
                 }
