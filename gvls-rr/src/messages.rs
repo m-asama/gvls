@@ -35,6 +35,13 @@ pub struct AuthVtepRep {
 }
 
 #[derive(Debug)]
+pub struct UpdateVtepStateMsg {
+    pub name: String,
+    pub ipv6_addr: Option<Ipv6Addr>,
+    pub last_update: String,
+}
+
+#[derive(Debug)]
 pub struct UpdateNeighsMsg {
     pub neighs: HashSet<Ipv6Addr>,
 }
@@ -92,7 +99,9 @@ pub enum RrLchMsg {
 }
 
 #[derive(Debug)]
-pub enum UiLchMsg {}
+pub enum UiLchMsg {
+    UpdateVtepState(UpdateVtepStateMsg),
+}
 
 #[derive(Debug)]
 pub enum VtepLchMsg {

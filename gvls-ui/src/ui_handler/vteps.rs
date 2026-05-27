@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Copyright(c) 2026 Masakazu Asama
 
+use std::collections::HashMap;
+use std::net::Ipv6Addr;
+
 use askama::Template;
 use axum::extract::State;
 use axum::response::{Html, IntoResponse, Redirect, Response};
@@ -29,6 +32,7 @@ struct VniChoice {
 struct VtepRow {
     name: String,
     owner_mail_addr: String,
+    state: String,
     description: String,
     owned_choices: Vec<VniChoice>,
     other_choices: Vec<VniChoice>,
@@ -68,6 +72,28 @@ async fn load_vteps(state: &AppState, account_id: i32) -> Result<ListVtepsRep, S
         .recv()
         .await
         .ok_or_else(|| "channel recv error".to_string())
+}
+
+fn vtep_state(
+    name: &String,
+    vtep_states: &HashMap<String, HashMap<String, (Option<Ipv6Addr>, String)>>,
+) -> String {
+    let mut states = Vec::<String>::new();
+    for (rr_name, vtep_states) in vtep_states {
+        if let Some(vtep_state) = vtep_states.get(name) {
+            if let Some(ipv6_addr) = &vtep_state.0 {
+                states.push(format!("{rr_name}: {ipv6_addr}<br>"));
+            } else {
+                states.push(format!("{rr_name}: ---<br>"));
+            }
+        }
+    }
+    states.sort();
+    let mut state_s = String::new();
+    for state in states {
+        state_s += &state;
+    }
+    state_s
 }
 
 fn build_rows(rep: &ListVtepsRep) -> Vec<VtepRow> {
@@ -110,6 +136,7 @@ fn build_rows(rep: &ListVtepsRep) -> Vec<VtepRow> {
                     .find(|account| account.id == vtep.account_id)
                     .map(|account| account.mail_addr.clone())
                     .unwrap_or_else(|| "-".to_string()),
+                state: vtep_state(&vtep.name, &rep.vtep_states),
                 description: vtep.description.clone(),
                 owned_choices,
                 other_choices,

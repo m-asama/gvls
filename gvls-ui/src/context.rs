@@ -2,7 +2,7 @@
 // Copyright(c) 2026 Masakazu Asama
 
 use std::collections::HashMap;
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::time::Instant;
 
 use argon2::{
@@ -20,8 +20,9 @@ use crate::{
     AuthAccountRep, AuthAccountReq, AuthRrRep, AuthRrReq, ChangePasswordReq, Config,
     CreateAccountReq, CreateVniReq, CreateVtepReq, DeleteAccountReq, DeleteVniReq, DeleteVtepReq,
     GetAccountByIdRep, GetAccountByIdReq, ListAccountsRep, ListAccountsReq, ListVnisRep,
-    ListVnisReq, ListVtepsRep, ListVtepsReq, OpRep, RrHandler, RrLchMsg, UiHandler, UiLchMsg,
-    UpdateAccountPermReq, UpdateVniVtepsReq, UpdateVtepVnisReq,
+    ListVnisReq, ListVtepsRep, ListVtepsReq, OpRep, RrExitMsg, RrHandler, RrLchMsg,
+    RrRegisteredMsg, UiHandler, UiLchMsg, UpdateAccountPermReq, UpdateVniVtepsReq,
+    UpdateVtepStateMsg, UpdateVtepVnisReq,
 };
 
 #[derive(Debug)]
@@ -39,6 +40,7 @@ pub struct Context {
     pub rrs: HashMap<String, Rr>,
     pub vteps: HashMap<String, Vtep>,
     pub vnis: HashMap<i32, Vni>,
+    vtep_states: HashMap<String, HashMap<String, (Option<Ipv6Addr>, String)>>,
     tx_lch: mpsc::Sender<UiLchMsg>,
     rx_lch: mpsc::Receiver<UiLchMsg>,
     rr_tx_lchs: HashMap<Ipv4Addr, mpsc::Sender<RrLchMsg>>,
@@ -61,6 +63,7 @@ impl Context {
             rrs: HashMap::<String, Rr>::new(),
             vteps: HashMap::<String, Vtep>::new(),
             vnis: HashMap::<i32, Vni>::new(),
+            vtep_states: HashMap::<String, HashMap<String, (Option<Ipv6Addr>, String)>>::new(),
             tx_lch,
             rx_lch,
             rr_tx_lchs: HashMap::<Ipv4Addr, mpsc::Sender<RrLchMsg>>::new(),
@@ -265,6 +268,7 @@ impl Context {
                     accounts: Vec::new(),
                     vteps: Vec::new(),
                     assignable_vnis: Vec::new(),
+                    vtep_states: self.vtep_states.clone(),
                 })
                 .await;
             return Ok(());
@@ -287,6 +291,7 @@ impl Context {
                 accounts,
                 vteps,
                 assignable_vnis,
+                vtep_states: self.vtep_states.clone(),
             })
             .await;
         Ok(())
@@ -926,6 +931,26 @@ impl Context {
         Ok(())
     }
 
+    async fn rr_registered(&mut self, msg: RrRegisteredMsg) -> Result<(), String> {
+        self.vtep_states.insert(
+            msg.name,
+            HashMap::<String, (Option<Ipv6Addr>, String)>::new(),
+        );
+        Ok(())
+    }
+
+    async fn rr_exit(&mut self, msg: RrExitMsg) -> Result<(), String> {
+        self.vtep_states.remove(&msg.name);
+        Ok(())
+    }
+
+    async fn update_vtep_state(&mut self, msg: UpdateVtepStateMsg) -> Result<(), String> {
+        if let Some(vtep_map) = self.vtep_states.get_mut(&msg.rr_name) {
+            vtep_map.insert(msg.vtep_name, (msg.ipv6_addr, msg.last_update));
+        }
+        Ok(())
+    }
+
     async fn lch(&mut self, msg: Option<UiLchMsg>) -> Result<(), String> {
         match msg {
             Some(UiLchMsg::GetAccountById(msg)) => self.get_account_by_id(msg).await,
@@ -944,6 +969,9 @@ impl Context {
             Some(UiLchMsg::DeleteAccount(msg)) => self.delete_account(msg).await,
             Some(UiLchMsg::UpdateAccountPerm(msg)) => self.update_account_perm(msg).await,
             Some(UiLchMsg::ChangePassword(msg)) => self.change_password(msg).await,
+            Some(UiLchMsg::RrRegistered(msg)) => self.rr_registered(msg).await,
+            Some(UiLchMsg::RrExit(msg)) => self.rr_exit(msg).await,
+            Some(UiLchMsg::UpdateVtepState(msg)) => self.update_vtep_state(msg).await,
             None => Err("Received none lch".to_string()),
         }
     }
@@ -976,7 +1004,7 @@ impl Context {
                     match ret {
                         Ok((tx_rch, rx_rch, IpAddr::V4(addr))) => {
                             let (tx_lch, rx_lch) = mpsc::channel(8);
-                            let _ = self.rr_tx_lchs.insert(addr, tx_lch);
+                            self.rr_tx_lchs.insert(addr, tx_lch);
                             let mut rr_handler =
                                 RrHandler::new(addr, tx_rch, rx_rch, self.tx_lch.clone(), rx_lch);
                             tokio::spawn(async move {

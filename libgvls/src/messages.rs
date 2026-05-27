@@ -74,6 +74,14 @@ pub struct VtepVniModifiedMsg {
 
 //
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct VtepStateUpdatedMsg {
+    pub name: String,
+    pub ipv6_addr: Option<Ipv6Addr>,
+    pub last_update: String,
+}
+
+//
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct NeighsUpdatedMsg {
     pub neigh_rx: rch::mpsc::Receiver<Ipv6Addr>,
 }
@@ -83,6 +91,7 @@ pub struct NeighsUpdatedMsg {
 pub enum UiRchMsg {
     Hello(HelloMsg),
     RegisterRrReq(RegisterRrReqMsg),
+    VtepStateUpdated(VtepStateUpdatedMsg),
 }
 
 //

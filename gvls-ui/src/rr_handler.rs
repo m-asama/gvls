@@ -7,9 +7,12 @@ use std::time::{Duration, Instant};
 use remoc::rch;
 use tokio::sync::mpsc;
 
-use libgvls::{HELLO_INTERVAL, HELLO_TIMEOUT, HelloMsg, RegisterRrRepMsg, RrRchMsg, UiRchMsg};
+use libgvls::{
+    HELLO_INTERVAL, HELLO_TIMEOUT, HelloMsg, RegisterRrRepMsg, RrRchMsg, UiRchMsg,
+    VtepStateUpdatedMsg,
+};
 
-use crate::{AuthRrReq, RrLchMsg, UiLchMsg};
+use crate::{AuthRrReq, RrExitMsg, RrLchMsg, RrRegisteredMsg, UiLchMsg, UpdateVtepStateMsg};
 
 pub struct RrHandler {
     addr: Ipv4Addr,
@@ -67,6 +70,19 @@ impl RrHandler {
         }
     }
 
+    async fn vtep_state_updated(&mut self, msg: VtepStateUpdatedMsg) -> Result<(), String> {
+        let msg = UiLchMsg::UpdateVtepState(UpdateVtepStateMsg {
+            rr_name: self.name.clone(),
+            vtep_name: msg.name,
+            ipv6_addr: msg.ipv6_addr,
+            last_update: msg.last_update,
+        });
+        if let Err(e) = self.tx_lch.send(msg).await {
+            return Err(format!("Send VTEP state updated error: {e}"));
+        }
+        Ok(())
+    }
+
     async fn rch(
         &mut self,
         msg: Result<Option<UiRchMsg>, rch::base::RecvError>,
@@ -82,6 +98,7 @@ impl RrHandler {
                 println!("Unexpected RegisterRrReq after RR registration");
                 Ok(())
             }
+            Ok(Some(UiRchMsg::VtepStateUpdated(msg))) => self.vtep_state_updated(msg).await,
             Ok(None) => Err(format!("Received none rch")),
             Err(e) => Err(format!("Receive error: {e}")),
         }
@@ -191,6 +208,17 @@ impl RrHandler {
         }
         drop(vni_tx);
 
+        // RrRegistered
+        let lmsg = UiLchMsg::RrRegistered(RrRegisteredMsg {
+            name: self.name.clone(),
+        });
+        println!("Sending RrRegistered {}", self.name);
+        if let Err(e) = self.tx_lch.send(lmsg).await {
+            println!("Send lch error: {e}");
+            return;
+        }
+        println!("Sent RrRegistered {}", self.name);
+
         println!("Registered: {} {}", self.name, self.addr);
         self.hello_last = Instant::now();
 
@@ -221,6 +249,14 @@ impl RrHandler {
                 }
             }
         }
+
+        // RrExit
+        println!("Sending RrExit {}", self.name);
+        let lmsg = UiLchMsg::RrExit(RrExitMsg {
+            name: self.name.clone(),
+        });
+        let _ = self.tx_lch.send(lmsg).await;
+        println!("Sent RrExit {}", self.name);
 
         println!("Exit: {} {}", self.name, self.addr);
     }

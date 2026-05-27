@@ -14,7 +14,8 @@ use libgvls::{BgpOps, RchListener, RrRchMsg, Vni, Vtep, VtepRchMsg, get_ifindex}
 use crate::{
     AddVniMsg, AddVtepMsg, AuthVtepRep, AuthVtepReq, Config, DelVniMsg, DelVtepMsg,
     LocAddrChangedMsg, ModVtepVniMsg, RrLchMsg, RrRegisteredMsg, RtnlHandler, UiHandler, UiLchMsg,
-    UpdateNeighsMsg, VtepExitMsg, VtepHandler, VtepLchMsg, VtepRegisteredMsg, ddns_renew,
+    UpdateNeighsMsg, UpdateVtepStateMsg, VtepExitMsg, VtepHandler, VtepLchMsg, VtepRegisteredMsg,
+    ddns_renew,
 };
 
 #[derive(Debug)]
@@ -145,6 +146,25 @@ impl Context {
         Ok(())
     }
 
+    async fn send_update_vtep_state(
+        &self,
+        name: String,
+        ipv6_addr: Option<Ipv6Addr>,
+        last_update: Instant,
+    ) {
+        let last_update = format!("{:?}", last_update);
+        let msg = UiLchMsg::UpdateVtepState(UpdateVtepStateMsg {
+            name,
+            ipv6_addr,
+            last_update,
+        });
+        if let Some(ui_tx_lch) = &self.ui_tx_lch {
+            if let Err(e) = ui_tx_lch.send(msg).await {
+                println!("Send update VTEP state failed: {e}");
+            }
+        }
+    }
+
     async fn send_update_neighs(&mut self, changed_vtep_name: &str) {
         for (name, vtep) in &self.vteps {
             if name == changed_vtep_name {
@@ -207,6 +227,16 @@ impl Context {
         }
         self.vteps = vteps;
         self.vnis = vnis;
+        for (_, vtep) in &self.vteps {
+            if let Some(last_update) = &vtep.last_update {
+                self.send_update_vtep_state(
+                    vtep.name.clone(),
+                    vtep.ipv6_addr.clone(),
+                    last_update.clone(),
+                )
+                .await;
+            }
+        }
         Ok(())
     }
 
@@ -298,8 +328,12 @@ impl Context {
                 true,
             )
             .await;
+        let now = Instant::now();
         vtep.ipv6_addr = Some(msg.rem_addr.clone());
-        vtep.last_update = Some(Instant::now());
+        vtep.last_update = Some(now.clone());
+        let name = vtep.name.clone();
+        let ipv6_addr = vtep.ipv6_addr.clone();
+        self.send_update_vtep_state(name, ipv6_addr, now).await;
         self.send_update_neighs(&msg.name).await;
         Ok(())
     }
@@ -317,8 +351,16 @@ impl Context {
                 return Ok(());
             }
         };
-        vtep.ipv6_addr = None;
-        vtep.last_update = Some(Instant::now());
+        if let Some(ipv6_addr) = &vtep.ipv6_addr
+            && ipv6_addr == &msg.rem_addr
+        {
+            let now = Instant::now();
+            vtep.ipv6_addr = None;
+            vtep.last_update = Some(now.clone());
+            let name = vtep.name.clone();
+            let ipv6_addr = vtep.ipv6_addr.clone();
+            self.send_update_vtep_state(name, ipv6_addr, now).await;
+        }
         self.send_update_neighs(&msg.name).await;
         Ok(())
     }

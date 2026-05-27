@@ -10,13 +10,13 @@ use tokio::sync::mpsc;
 
 use libgvls::{
     HELLO_INTERVAL, HELLO_TIMEOUT, HelloMsg, RegisterRrReqMsg, RrRchMsg, UiRchMsg, Vni,
-    VniAddedMsg, VniDeletedMsg, Vtep, VtepAddedMsg, VtepDeletedMsg, VtepVniModifiedMsg,
-    rch_connect_addr,
+    VniAddedMsg, VniDeletedMsg, Vtep, VtepAddedMsg, VtepDeletedMsg, VtepStateUpdatedMsg,
+    VtepVniModifiedMsg, rch_connect_addr,
 };
 
 use crate::{
     AddVniMsg, AddVtepMsg, DelVniMsg, DelVtepMsg, ModVtepVniMsg, RrLchMsg, RrRegisteredMsg,
-    UiLchMsg,
+    UiLchMsg, UpdateVtepStateMsg,
 };
 
 pub struct UiHandler {
@@ -227,6 +227,20 @@ impl UiHandler {
         Ok(())
     }
 
+    async fn update_vtep_state(&mut self, msg: UpdateVtepStateMsg) -> Result<(), String> {
+        if let Some(tx_rch) = &mut self.tx_rch {
+            let rmsg = UiRchMsg::VtepStateUpdated(VtepStateUpdatedMsg {
+                name: msg.name,
+                ipv6_addr: msg.ipv6_addr,
+                last_update: msg.last_update,
+            });
+            if let Err(e) = tx_rch.send(rmsg).await {
+                return Err(format!("Send update VTEP error: {e}"));
+            }
+        }
+        Ok(())
+    }
+
     async fn rch(
         &mut self,
         msg: Result<Option<RrRchMsg>, rch::base::RecvError>,
@@ -253,6 +267,7 @@ impl UiHandler {
 
     async fn lch(&mut self, msg: Option<UiLchMsg>) -> Result<(), String> {
         match msg {
+            Some(UiLchMsg::UpdateVtepState(msg)) => self.update_vtep_state(msg).await,
             None => Err(format!("Received none lch")),
         }
     }

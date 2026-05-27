@@ -42,6 +42,7 @@ VTEPs - 銀座堂仮想 LAN サービス
 {%- else -%}
           <th>VNIs</th>
 {%- endif -%}
+          <th>State</th>
           <th>Description</th>
           <th></th>
         </tr>
@@ -67,6 +68,7 @@ VTEPs - 銀座堂仮想 LAN サービス
 {%-     endfor -%}
             </td>
 {%-   endif -%}
+            <td>{{ row.state | safe }}</td>
             <td><input name="description" value="{{ row.description }}"></td>
             <td align="right">
               <button type="submit" name="action" value="update">Save</button>

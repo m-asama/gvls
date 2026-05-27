@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright(c) 2026 Masakazu Asama
 
-use std::collections::HashSet;
-use std::net::Ipv4Addr;
+use std::collections::{HashMap, HashSet};
+use std::net::{Ipv4Addr, Ipv6Addr};
 
 use tokio::sync::mpsc;
 
@@ -64,6 +64,7 @@ pub struct ListVtepsRep {
     pub accounts: Vec<Account>,
     pub vteps: Vec<Vtep>,
     pub assignable_vnis: Vec<Vni>,
+    pub vtep_states: HashMap<String, HashMap<String, (Option<Ipv6Addr>, String)>>,
 }
 
 #[derive(Debug)]
@@ -174,6 +175,24 @@ pub struct ChangePasswordReq {
 }
 
 #[derive(Debug)]
+pub struct RrRegisteredMsg {
+    pub name: String,
+}
+
+#[derive(Debug)]
+pub struct RrExitMsg {
+    pub name: String,
+}
+
+#[derive(Debug)]
+pub struct UpdateVtepStateMsg {
+    pub rr_name: String,
+    pub vtep_name: String,
+    pub ipv6_addr: Option<Ipv6Addr>,
+    pub last_update: String,
+}
+
+#[derive(Debug)]
 pub enum UiLchMsg {
     GetAccountById(GetAccountByIdReq),
     AuthAccount(AuthAccountReq),
@@ -191,6 +210,9 @@ pub enum UiLchMsg {
     DeleteAccount(DeleteAccountReq),
     UpdateAccountPerm(UpdateAccountPermReq),
     ChangePassword(ChangePasswordReq),
+    RrRegistered(RrRegisteredMsg),
+    RrExit(RrExitMsg),
+    UpdateVtepState(UpdateVtepStateMsg),
 }
 
 #[derive(Debug, Clone)]
