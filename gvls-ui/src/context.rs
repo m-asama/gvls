@@ -14,7 +14,7 @@ use argon2::{
 };
 use tokio::sync::mpsc;
 
-use libgvls::{Account, Permission, RchListener, Rr, RrRchMsg, UiRchMsg, Vni, Vtep};
+use libgvls::{Account, Permission, RchListener, Rr, UiRchMsg, UiRrRchMsg, Vni, Vtep};
 
 use crate::{
     AuthAccountRep, AuthAccountReq, AuthRrRep, AuthRrReq, ChangePasswordReq, Config,
@@ -1000,7 +1000,7 @@ impl Context {
 
         loop {
             tokio::select! {
-                ret = rch_listener.rch_accept::<RrRchMsg, UiRchMsg>() => {
+                ret = rch_listener.rch_accept::<UiRrRchMsg, UiRchMsg>() => {
                     match ret {
                         Ok((tx_rch, rx_rch, IpAddr::V4(addr))) => {
                             let (tx_lch, rx_lch) = mpsc::channel(8);

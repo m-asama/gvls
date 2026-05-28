@@ -9,8 +9,8 @@ use remoc::rch;
 use tokio::sync::mpsc;
 
 use libgvls::{
-    HELLO_INTERVAL, HELLO_TIMEOUT, HelloMsg, NeighsUpdatedMsg, RegisterVtepRepMsg, RrRchMsg,
-    VtepRchMsg,
+    HELLO_INTERVAL, HELLO_TIMEOUT, HelloMsg, NeighsUpdatedMsg, RegisterVtepRepMsg, VtepRchMsg,
+    VtepRrRchMsg,
 };
 
 use crate::{AuthVtepReq, RrLchMsg, UpdateNeighsMsg, VtepExitMsg, VtepLchMsg, VtepRegisteredMsg};
@@ -22,7 +22,7 @@ pub struct VtepHandler {
     hello_last: Instant,
     neighs_sent: HashSet<Ipv6Addr>,
     tx_rch: rch::base::Sender<VtepRchMsg>,
-    rx_rch: rch::base::Receiver<RrRchMsg>,
+    rx_rch: rch::base::Receiver<VtepRrRchMsg>,
     tx_lch: mpsc::Sender<RrLchMsg>,
     rx_lch: mpsc::Receiver<VtepLchMsg>,
 }
@@ -31,7 +31,7 @@ impl VtepHandler {
     pub fn new(
         addr: Ipv6Addr,
         tx_rch: rch::base::Sender<VtepRchMsg>,
-        rx_rch: rch::base::Receiver<RrRchMsg>,
+        rx_rch: rch::base::Receiver<VtepRrRchMsg>,
         tx_lch: mpsc::Sender<RrLchMsg>,
         rx_lch: mpsc::Receiver<VtepLchMsg>,
     ) -> Self {
@@ -91,37 +91,17 @@ impl VtepHandler {
 
     async fn rch(
         &mut self,
-        msg: Result<Option<RrRchMsg>, rch::base::RecvError>,
+        msg: Result<Option<VtepRrRchMsg>, rch::base::RecvError>,
     ) -> Result<(), String> {
         match msg {
-            Ok(Some(RrRchMsg::Hello(_))) => {
+            Ok(Some(VtepRrRchMsg::Hello(_))) => {
                 println!("Received hello {} {}", self.name, self.addr);
                 self.hello_last = Instant::now();
                 Ok(())
             }
-            Ok(Some(RrRchMsg::RegisterVtepReq(_))) => {
+            Ok(Some(VtepRrRchMsg::RegisterVtepReq(_))) => {
                 // RegisterVtepReq は run で処理する最初のみ
                 println!("Unexpected RegisterVtepReq after VTEP registration");
-                Ok(())
-            }
-            Ok(Some(RrRchMsg::VtepAdded(_))) => {
-                println!("Unexpected VtepAdded received from VTEP");
-                Ok(())
-            }
-            Ok(Some(RrRchMsg::VtepDeleted(_))) => {
-                println!("Unexpected VtepDeleted received from VTEP");
-                Ok(())
-            }
-            Ok(Some(RrRchMsg::VniAdded(_))) => {
-                println!("Unexpected VniAdded received from VTEP");
-                Ok(())
-            }
-            Ok(Some(RrRchMsg::VniDeleted(_))) => {
-                println!("Unexpected VniDeleted received from VTEP");
-                Ok(())
-            }
-            Ok(Some(RrRchMsg::VtepVniModified(_))) => {
-                println!("Unexpected VtepVniModified received from VTEP");
                 Ok(())
             }
             Ok(None) => Err(format!("Received none rch")),
@@ -138,7 +118,7 @@ impl VtepHandler {
 
     pub async fn run(&mut self) {
         // RegisterVtepReq
-        let rreq = if let Ok(Some(RrRchMsg::RegisterVtepReq(rreq))) = self.rx_rch.recv().await {
+        let rreq = if let Ok(Some(VtepRrRchMsg::RegisterVtepReq(rreq))) = self.rx_rch.recv().await {
             rreq
         } else {
             println!("First msg not RegisterVtepReq");

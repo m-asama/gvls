@@ -96,14 +96,20 @@ pub enum UiRchMsg {
 
 //
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub enum RrRchMsg {
+pub enum UiRrRchMsg {
     Hello(HelloMsg),
-    RegisterVtepReq(RegisterVtepReqMsg),
     VtepAdded(VtepAddedMsg),
     VtepDeleted(VtepDeletedMsg),
     VniAdded(VniAddedMsg),
     VniDeleted(VniDeletedMsg),
     VtepVniModified(VtepVniModifiedMsg),
+}
+
+//
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub enum VtepRrRchMsg {
+    Hello(HelloMsg),
+    RegisterVtepReq(RegisterVtepReqMsg),
 }
 
 //

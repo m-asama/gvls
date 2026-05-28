@@ -9,8 +9,8 @@ use remoc::rch;
 use tokio::sync::mpsc;
 
 use libgvls::{
-    HELLO_INTERVAL, HELLO_TIMEOUT, HelloMsg, NeighsUpdatedMsg, RegisterVtepReqMsg, RrRchMsg,
-    VtepRchMsg, rch_connect_host,
+    HELLO_INTERVAL, HELLO_TIMEOUT, HelloMsg, NeighsUpdatedMsg, RegisterVtepReqMsg, VtepRchMsg,
+    VtepRrRchMsg, rch_connect_host,
 };
 
 use crate::{
@@ -28,7 +28,7 @@ pub struct RrHandler {
     conn_try_next: Instant,
     hello_next: Instant,
     hello_last: Instant,
-    tx_rch: Option<rch::base::Sender<RrRchMsg>>,
+    tx_rch: Option<rch::base::Sender<VtepRrRchMsg>>,
     rx_rch: Option<rch::base::Receiver<VtepRchMsg>>,
     tx_lch: mpsc::Sender<VtepLchMsg>,
     rx_lch: mpsc::Receiver<RrLchMsg>,
@@ -95,7 +95,7 @@ impl RrHandler {
             return Ok(());
         }
         if let Some(tx_rch) = &mut self.tx_rch {
-            let req = RrRchMsg::Hello(HelloMsg {});
+            let req = VtepRrRchMsg::Hello(HelloMsg {});
             println!("Sending hello {}", self.rr_host);
             if let Err(e) = tx_rch.send(req).await {
                 return Err(format!("Send hello error: {e}"));
@@ -129,7 +129,7 @@ impl RrHandler {
         let rr_port = self.rr_port;
         let loc_addr = &self.loc_addr.unwrap().clone();
         let (tx_rch, rx_rch, rem_addr) =
-            match rch_connect_host::<RrRchMsg, VtepRchMsg>(rr_host, rr_port, *loc_addr).await {
+            match rch_connect_host::<VtepRrRchMsg, VtepRchMsg>(rr_host, rr_port, *loc_addr).await {
                 Ok((tx_rch, rx_rch, rem_addr)) => (tx_rch, rx_rch, rem_addr),
                 Err(e) => {
                     println!("RR remoc connect ({}) failed: {e}", self.rr_host);
@@ -144,7 +144,7 @@ impl RrHandler {
 
         // RegisterVtepReq
         let (rep_tx, mut rep_rx) = rch::mpsc::channel(1);
-        let req = RrRchMsg::RegisterVtepReq(RegisterVtepReqMsg {
+        let req = VtepRrRchMsg::RegisterVtepReq(RegisterVtepReqMsg {
             name: self.vtep_name.clone(),
             password: self.vtep_pass.clone(),
             rep_tx,

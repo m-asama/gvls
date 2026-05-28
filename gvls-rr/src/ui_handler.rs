@@ -9,7 +9,7 @@ use remoc::rch;
 use tokio::sync::mpsc;
 
 use libgvls::{
-    HELLO_INTERVAL, HELLO_TIMEOUT, HelloMsg, RegisterRrReqMsg, RrRchMsg, UiRchMsg, Vni,
+    HELLO_INTERVAL, HELLO_TIMEOUT, HelloMsg, RegisterRrReqMsg, UiRchMsg, UiRrRchMsg, Vni,
     VniAddedMsg, VniDeletedMsg, Vtep, VtepAddedMsg, VtepDeletedMsg, VtepStateUpdatedMsg,
     VtepVniModifiedMsg, rch_connect_addr,
 };
@@ -29,7 +29,7 @@ pub struct UiHandler {
     hello_next: Instant,
     hello_last: Instant,
     tx_rch: Option<rch::base::Sender<UiRchMsg>>,
-    rx_rch: Option<rch::base::Receiver<RrRchMsg>>,
+    rx_rch: Option<rch::base::Receiver<UiRrRchMsg>>,
     tx_lch: mpsc::Sender<RrLchMsg>,
     rx_lch: mpsc::Receiver<UiLchMsg>,
 }
@@ -112,15 +112,15 @@ impl UiHandler {
         // rch connect
         let ui_addr = IpAddr::V4(self.ui_addr.clone());
         let ui_port = self.ui_port;
-        let (tx_rch, rx_rch) = match rch_connect_addr::<UiRchMsg, RrRchMsg>(ui_addr, ui_port).await
-        {
-            Ok((tx_rch, rx_rch)) => (tx_rch, rx_rch),
-            Err(e) => {
-                println!("gvls-ui remoc connect ({}) failed: {e}", self.ui_addr);
-                self.retry();
-                return;
-            }
-        };
+        let (tx_rch, rx_rch) =
+            match rch_connect_addr::<UiRchMsg, UiRrRchMsg>(ui_addr, ui_port).await {
+                Ok((tx_rch, rx_rch)) => (tx_rch, rx_rch),
+                Err(e) => {
+                    println!("gvls-ui remoc connect ({}) failed: {e}", self.ui_addr);
+                    self.retry();
+                    return;
+                }
+            };
         self.tx_rch = Some(tx_rch);
         self.rx_rch = Some(rx_rch);
         self.conn_try_count = 0;
@@ -243,23 +243,19 @@ impl UiHandler {
 
     async fn rch(
         &mut self,
-        msg: Result<Option<RrRchMsg>, rch::base::RecvError>,
+        msg: Result<Option<UiRrRchMsg>, rch::base::RecvError>,
     ) -> Result<(), String> {
         match msg {
-            Ok(Some(RrRchMsg::Hello(_))) => {
+            Ok(Some(UiRrRchMsg::Hello(_))) => {
                 println!("Received hello {}", self.ui_addr);
                 self.hello_last = Instant::now();
                 Ok(())
             }
-            Ok(Some(RrRchMsg::RegisterVtepReq(_))) => {
-                println!("Unexpected RegisterVtepReq received from gvls-ui channel");
-                Ok(())
-            }
-            Ok(Some(RrRchMsg::VtepAdded(msg))) => self.vtep_added(msg).await,
-            Ok(Some(RrRchMsg::VtepDeleted(msg))) => self.vtep_deleted(msg).await,
-            Ok(Some(RrRchMsg::VniAdded(msg))) => self.vni_added(msg).await,
-            Ok(Some(RrRchMsg::VniDeleted(msg))) => self.vni_deleted(msg).await,
-            Ok(Some(RrRchMsg::VtepVniModified(msg))) => self.vtep_vni_modified(msg).await,
+            Ok(Some(UiRrRchMsg::VtepAdded(msg))) => self.vtep_added(msg).await,
+            Ok(Some(UiRrRchMsg::VtepDeleted(msg))) => self.vtep_deleted(msg).await,
+            Ok(Some(UiRrRchMsg::VniAdded(msg))) => self.vni_added(msg).await,
+            Ok(Some(UiRrRchMsg::VniDeleted(msg))) => self.vni_deleted(msg).await,
+            Ok(Some(UiRrRchMsg::VtepVniModified(msg))) => self.vtep_vni_modified(msg).await,
             Ok(None) => Err(format!("Received none rch")),
             Err(e) => Err(format!("Receive error: {e}")),
         }

@@ -8,7 +8,7 @@ use remoc::rch;
 use tokio::sync::mpsc;
 
 use libgvls::{
-    HELLO_INTERVAL, HELLO_TIMEOUT, HelloMsg, RegisterRrRepMsg, RrRchMsg, UiRchMsg,
+    HELLO_INTERVAL, HELLO_TIMEOUT, HelloMsg, RegisterRrRepMsg, UiRchMsg, UiRrRchMsg,
     VtepStateUpdatedMsg,
 };
 
@@ -19,7 +19,7 @@ pub struct RrHandler {
     name: String,
     hello_next: Instant,
     hello_last: Instant,
-    tx_rch: rch::base::Sender<RrRchMsg>,
+    tx_rch: rch::base::Sender<UiRrRchMsg>,
     rx_rch: rch::base::Receiver<UiRchMsg>,
     tx_lch: mpsc::Sender<UiLchMsg>,
     rx_lch: mpsc::Receiver<RrLchMsg>,
@@ -28,7 +28,7 @@ pub struct RrHandler {
 impl RrHandler {
     pub fn new(
         addr: Ipv4Addr,
-        tx_rch: rch::base::Sender<RrRchMsg>,
+        tx_rch: rch::base::Sender<UiRrRchMsg>,
         rx_rch: rch::base::Receiver<UiRchMsg>,
         tx_lch: mpsc::Sender<UiLchMsg>,
         rx_lch: mpsc::Receiver<RrLchMsg>,
@@ -52,7 +52,7 @@ impl RrHandler {
         if Instant::now() < self.hello_next {
             return Ok(());
         }
-        let req = RrRchMsg::Hello(HelloMsg {});
+        let req = UiRrRchMsg::Hello(HelloMsg {});
         println!("Sending hello {} {}", self.name, self.addr);
         if let Err(e) = self.tx_rch.send(req).await {
             return Err(format!("Send hello error: {e}"));
@@ -108,27 +108,27 @@ impl RrHandler {
         match msg {
             Some(RrLchMsg::VtepAdded(vtep)) => self
                 .tx_rch
-                .send(RrRchMsg::VtepAdded(libgvls::VtepAddedMsg { vtep }))
+                .send(UiRrRchMsg::VtepAdded(libgvls::VtepAddedMsg { vtep }))
                 .await
                 .map_err(|e| format!("Send VtepAdded error: {e}")),
             Some(RrLchMsg::VtepDeleted(vtep)) => self
                 .tx_rch
-                .send(RrRchMsg::VtepDeleted(libgvls::VtepDeletedMsg { vtep }))
+                .send(UiRrRchMsg::VtepDeleted(libgvls::VtepDeletedMsg { vtep }))
                 .await
                 .map_err(|e| format!("Send VtepDeleted error: {e}")),
             Some(RrLchMsg::VniAdded(vni)) => self
                 .tx_rch
-                .send(RrRchMsg::VniAdded(libgvls::VniAddedMsg { vni }))
+                .send(UiRrRchMsg::VniAdded(libgvls::VniAddedMsg { vni }))
                 .await
                 .map_err(|e| format!("Send VniAdded error: {e}")),
             Some(RrLchMsg::VniDeleted(vni)) => self
                 .tx_rch
-                .send(RrRchMsg::VniDeleted(libgvls::VniDeletedMsg { vni }))
+                .send(UiRrRchMsg::VniDeleted(libgvls::VniDeletedMsg { vni }))
                 .await
                 .map_err(|e| format!("Send VniDeleted error: {e}")),
             Some(RrLchMsg::VtepVniModified { vtep, vni }) => self
                 .tx_rch
-                .send(RrRchMsg::VtepVniModified(libgvls::VtepVniModifiedMsg {
+                .send(UiRrRchMsg::VtepVniModified(libgvls::VtepVniModifiedMsg {
                     vtep,
                     vni,
                 }))
