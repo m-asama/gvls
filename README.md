@@ -74,6 +74,15 @@ Create VTEP の Description にその VTEP の説明を適当に入力し、VTEP
 [VTEPs](https://gvls.ginzado.ne.jp/vteps) で VTEP の VNIs に表示された VNI のチェックを入れ「Save」を押すか、
 いずれかの方法で紐づけることができます。
 
+### VTEP に ipset をインストールする
+
+`gvls-vtep` は `ipset` コマンドで VXLAN パケットを送ってき得る IPv6 アドレスを管理します。
+`ipset` コマンドは標準インストールではインストールされていないのでインストールします。
+
+```shell
+$ sudo apt install ipset
+```
+
 ### VTEP に zebra-rs をインストールする
 
 [zebra-rs](https://zebra.rs/) を VTEP としたい Ubuntu にインストールします。
