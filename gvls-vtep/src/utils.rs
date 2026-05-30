@@ -32,6 +32,7 @@ pub async fn init_vni(vni: u32, ifname: &str, local: &Option<Ipv6Addr>) -> Resul
     exec(vec!["ip", "link", "set", &brname, "up"]).await;
     sysctl(&format!("net.ipv4.conf.{brname}.forwarding=0")).await;
     sysctl(&format!("net.ipv6.conf.{brname}.forwarding=0")).await;
+    sysctl(&format!("net.ipv6.conf.{brname}.accept_ra=0")).await;
 
     // vni setup
     if link_exists(&vniname).await {
