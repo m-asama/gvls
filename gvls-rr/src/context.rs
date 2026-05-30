@@ -568,7 +568,6 @@ impl Context {
                         }
                         Err(e) => {
                             println!("Rch accept error: {e}");
-                            break;
                         }
                     }
                 }
