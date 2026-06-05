@@ -1,5 +1,7 @@
 # 銀座堂仮想 LAN サービス
 
+Interop26 に出展します。配布資料は[こちら](./interop26_m-asama.pdf)。
+
 ## 概要
 
 銀座堂仮想 LAN サービス ( https://gvls.ginzado.ne.jp/ ) は EVPN/VXLAN による L2VPN をフレッツ閉域 IPv6 網で簡単に構築することができるサービスです。
