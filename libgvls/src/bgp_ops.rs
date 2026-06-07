@@ -88,10 +88,10 @@ impl BgpOps {
         }
     }
 
-    pub async fn wait(&self) -> Result<(), String> {
+    pub async fn ready(&self) -> Result<(), String> {
         match self {
-            BgpOps::Frr(bgp_ops) => bgp_ops.wait().await,
-            BgpOps::ZebraRs(bgp_ops) => bgp_ops.wait().await,
+            BgpOps::Frr(bgp_ops) => bgp_ops.ready().await,
+            BgpOps::ZebraRs(bgp_ops) => bgp_ops.ready().await,
         }
     }
 }

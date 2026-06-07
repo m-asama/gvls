@@ -3,10 +3,8 @@
 
 use std::collections::HashSet;
 use std::net::Ipv6Addr;
-use std::time::Duration;
 
 use tokio::process::Command;
-use tokio::time::sleep;
 
 const ROUTE_MAP_PREFIX: &str = "gvlm-rm";
 
@@ -112,20 +110,17 @@ set router bgp afi-safi evpn advertise-all-vni true"
         .await;
     }
 
-    pub async fn wait(&self) -> Result<(), String> {
-        for _ in 0..60 {
-            if let Ok(status) = Command::new("vtyctl")
-                .arg("show")
-                .arg("version")
-                .status()
-                .await
-            {
-                if status.success() {
-                    return Ok(());
-                }
+    pub async fn ready(&self) -> Result<(), String> {
+        if let Ok(status) = Command::new("vtyctl")
+            .arg("show")
+            .arg("version")
+            .status()
+            .await
+        {
+            if status.success() {
+                return Ok(());
             }
-            sleep(Duration::from_secs(1)).await;
         }
-        Err(format!("Waiting zebra-rs timed out"))
+        Err(format!("Not ready"))
     }
 }

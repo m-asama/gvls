@@ -3,8 +3,10 @@
 
 use std::collections::HashSet;
 use std::net::Ipv6Addr;
+use std::time::Duration;
 
 use tokio::sync::mpsc;
+use tokio::time::sleep;
 
 use libgvls::{BgpOps, get_ifindex};
 
@@ -231,9 +233,33 @@ impl Context {
         }
     }
 
+    async fn wait(&self) -> Result<(), String> {
+        let mut bgp_ready: bool = false;
+        let mut src_if_ready: bool = false;
+        for _ in 0..60 {
+            if !bgp_ready {
+                if let Ok(_) = self.bgp_ops.ready().await {
+                    bgp_ready = true;
+                }
+            }
+            if !src_if_ready {
+                if let Ok(_) = get_ifindex(&self.src_ifname).await {
+                    src_if_ready = true;
+                }
+            }
+            if bgp_ready && src_if_ready {
+                return Ok(());
+            }
+            sleep(Duration::from_secs(1)).await;
+        }
+        Err(format!(
+            "bgp_ready = {bgp_ready} src_if_ready = {src_if_ready}"
+        ))
+    }
+
     pub async fn run(&mut self) {
-        if let Err(e) = self.bgp_ops.wait().await {
-            println!("Waiting BGP backend error: {e}");
+        if let Err(e) = self.wait().await {
+            println!("Waiting BGP backend and source interface error: {e}");
             return;
         }
         if let Err(e) = self.init_src_ifindex().await {
