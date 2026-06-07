@@ -1,5 +1,7 @@
 # 銀座堂仮想 LAN サービス
 
+Interop26 に出展します。配布資料は[こちら](./interop26_m-asama.pdf)。
+
 ## 概要
 
 銀座堂仮想 LAN サービス ( https://gvls.ginzado.ne.jp/ ) は EVPN/VXLAN による L2VPN をフレッツ閉域 IPv6 網で簡単に構築することができるサービスです。
@@ -73,6 +75,15 @@ Create VTEP の Description にその VTEP の説明を適当に入力し、VTEP
 [VNIs](https://gvls.ginzado.ne.jp/vnis) で VNI の VTEPs に表示された VTEP のチェックを入れ「Save」を押すか、
 [VTEPs](https://gvls.ginzado.ne.jp/vteps) で VTEP の VNIs に表示された VNI のチェックを入れ「Save」を押すか、
 いずれかの方法で紐づけることができます。
+
+### VTEP に ipset をインストールする
+
+`gvls-vtep` は `ipset` コマンドで VXLAN パケットを送ってき得る IPv6 アドレスを管理します。
+`ipset` コマンドは標準インストールではインストールされていないのでインストールします。
+
+```shell
+$ sudo apt install ipset
+```
 
 ### VTEP に zebra-rs をインストールする
 
