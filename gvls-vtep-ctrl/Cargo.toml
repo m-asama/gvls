@@ -1,0 +1,23 @@
+[package]
+name = "gvls-vtep-ctrl"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+libgvls = { path = "../libgvls" }
+tokio = { version = "1.51.1", features = ["rt-multi-thread", "process", "net", "sync", "macros"] }
+serde = { version = "1.0.228", features = ["derive"] }
+remoc = "0.18.3"
+
+[package.metadata.deb]
+maintainer = "Masakazu Asama <masakazu.asama@gmail.com>"
+copyright = "2026, Masakazu Asama <masakazu.asama@gmail.com>"
+license-file = ["LICENSE", "4"]
+extended-description = "GVLS VTEP controll"
+depends = "$auto"
+section = "admin"
+priority = "optional"
+maintainer-scripts = "debian/"
+assets = [
+    ["target/release/gvls-vtep-ctrl", "usr/sbin/", "755"],
+]

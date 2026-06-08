@@ -9,7 +9,7 @@ use remoc::rch;
 use tokio::sync::mpsc;
 
 use libgvls::{
-    HELLO_INTERVAL, HELLO_TIMEOUT, HelloMsg, NeighsUpdatedMsg, RegisterVtepRepMsg, VtepRchMsg,
+    HELLO_INTERVAL, HELLO_TIMEOUT, HelloMsg, NeighsUpdatedMsg, RegisterVtepRepMsg, RrVtepRchMsg,
     VtepRrRchMsg,
 };
 
@@ -21,7 +21,7 @@ pub struct VtepHandler {
     hello_next: Instant,
     hello_last: Instant,
     neighs_sent: HashSet<Ipv6Addr>,
-    tx_rch: rch::base::Sender<VtepRchMsg>,
+    tx_rch: rch::base::Sender<RrVtepRchMsg>,
     rx_rch: rch::base::Receiver<VtepRrRchMsg>,
     tx_lch: mpsc::Sender<RrLchMsg>,
     rx_lch: mpsc::Receiver<VtepLchMsg>,
@@ -30,7 +30,7 @@ pub struct VtepHandler {
 impl VtepHandler {
     pub fn new(
         addr: Ipv6Addr,
-        tx_rch: rch::base::Sender<VtepRchMsg>,
+        tx_rch: rch::base::Sender<RrVtepRchMsg>,
         rx_rch: rch::base::Receiver<VtepRrRchMsg>,
         tx_lch: mpsc::Sender<RrLchMsg>,
         rx_lch: mpsc::Receiver<VtepLchMsg>,
@@ -52,7 +52,7 @@ impl VtepHandler {
         if Instant::now() < self.hello_next {
             return Ok(());
         }
-        let req = VtepRchMsg::Hello(HelloMsg {});
+        let req = RrVtepRchMsg::Hello(HelloMsg {});
         println!("Sending hello {} {}", self.name, self.addr);
         if let Err(e) = self.tx_rch.send(req).await {
             return Err(format!("Send hello error: {e}"));
@@ -75,7 +75,7 @@ impl VtepHandler {
             return Ok(());
         }
         let (neigh_tx, neigh_rx) = rch::mpsc::channel(1);
-        let rmsg = VtepRchMsg::NeighsUpdated(NeighsUpdatedMsg { neigh_rx: neigh_rx });
+        let rmsg = RrVtepRchMsg::NeighsUpdated(NeighsUpdatedMsg { neigh_rx: neigh_rx });
         if let Err(e) = self.tx_rch.send(rmsg).await {
             println!("Send neighs updated {} {} error: {e}", self.name, self.addr);
         }

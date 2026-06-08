@@ -5,15 +5,19 @@ use std::collections::HashSet;
 use std::net::Ipv6Addr;
 use std::time::Duration;
 
+use remoc::rch;
 use tokio::sync::mpsc;
 use tokio::time::sleep;
 
-use libgvls::{BgpOps, get_ifindex};
+use libgvls::{
+    AddVniRepMsg, AddVniReqMsg, BgpOps, DelVniRepMsg, DelVniReqMsg, UdsRchListener,
+    VtepCtrlVtepRchMsg, VtepVtepCtrlRchMsg, exec, get_ifindex,
+};
 
 use crate::{
     Config, LocAddrChangedMsg, RemAddrChangedMsg, RrHandler, RrLchMsg, RtnlHandler,
-    UpdateNeighsMsg, VtepLchMsg, VtepRegisteredMsg, add_neigh, del_neigh, init_neighs, init_vni,
-    update_bgp, update_vni,
+    UpdateNeighsMsg, VtepLchMsg, VtepRegisteredMsg, add_neigh, add_vni, del_neigh, del_vni,
+    init_neighs, update_bgp, update_vni,
 };
 
 #[derive(Debug)]
@@ -24,6 +28,7 @@ pub struct Context {
     src_ifindex: u32,
     rr_hosts: [String; 2],
     rr_ports: [u16; 2],
+    rch_path: String,
     vnis: Vec<(u32, String)>,
     bgp_ops: BgpOps,
     bgp_asnum: u32,
@@ -55,6 +60,7 @@ impl Context {
             src_ifindex: 0,
             rr_hosts: conf.rr_hosts,
             rr_ports: conf.rr_ports,
+            rch_path: conf.rch_path,
             vnis: conf.vnis,
             bgp_ops: conf.bgp_ops,
             bgp_asnum: conf.bgp_asnum,
@@ -78,7 +84,7 @@ impl Context {
 
     async fn init_vnis(&self) -> Result<(), String> {
         for (vni, ifname) in &self.vnis {
-            if let Err(e) = init_vni(*vni, ifname, &self.loc_addr).await {
+            if let Err(e) = add_vni(*vni, ifname, &self.loc_addr).await {
                 return Err(format!("Setup VNI {vni}:{ifname} error: {e}"));
             }
         }
@@ -257,6 +263,84 @@ impl Context {
         ))
     }
 
+    async fn add_vni(
+        &mut self,
+        req: AddVniReqMsg,
+        mut tx_rch: rch::base::Sender<VtepVtepCtrlRchMsg>,
+    ) -> Result<(), String> {
+        for (vni, _) in &self.vnis {
+            if req.vni == *vni {
+                let err = Err(format!("VNI {vni} is already exists"));
+                let rep = VtepVtepCtrlRchMsg::AddVniRep(AddVniRepMsg {
+                    result: err.clone(),
+                });
+                let _ = tx_rch.send(rep).await;
+                return err;
+            }
+        }
+        if let Err(e) = add_vni(req.vni, &req.ifname, &self.loc_addr).await {
+            let err = Err(format!("Add VNI {}:{} error: {e}", req.vni, req.ifname));
+            let rep = VtepVtepCtrlRchMsg::AddVniRep(AddVniRepMsg {
+                result: err.clone(),
+            });
+            let _ = tx_rch.send(rep).await;
+            return err;
+        }
+        self.vnis.push((req.vni, req.ifname));
+        let rep = VtepVtepCtrlRchMsg::AddVniRep(AddVniRepMsg { result: Ok(()) });
+        let _ = tx_rch.send(rep).await;
+        Ok(())
+    }
+
+    async fn del_vni(
+        &mut self,
+        req: DelVniReqMsg,
+        mut tx_rch: rch::base::Sender<VtepVtepCtrlRchMsg>,
+    ) -> Result<(), String> {
+        let mut vnis = Vec::<(u32, String)>::new();
+        let mut found = false;
+        for (vni, ifname) in &self.vnis {
+            if req.vni == *vni {
+                found = true;
+            } else {
+                vnis.push((*vni, ifname.clone()));
+            }
+        }
+        if !found {
+            let err = Err(format!("VNI {} is not exist", req.vni));
+            let rep = VtepVtepCtrlRchMsg::DelVniRep(DelVniRepMsg {
+                result: err.clone(),
+            });
+            let _ = tx_rch.send(rep).await;
+            return err;
+        }
+        if let Err(e) = del_vni(req.vni).await {
+            let err = Err(format!("Delete VNI {} error: {e}", req.vni));
+            let rep = VtepVtepCtrlRchMsg::DelVniRep(DelVniRepMsg {
+                result: err.clone(),
+            });
+            let _ = tx_rch.send(rep).await;
+            return err;
+        }
+        self.vnis = vnis;
+        let rep = VtepVtepCtrlRchMsg::DelVniRep(DelVniRepMsg { result: Ok(()) });
+        let _ = tx_rch.send(rep).await;
+        Ok(())
+    }
+
+    async fn vtep_ctrl(
+        &mut self,
+        tx_rch: rch::base::Sender<VtepVtepCtrlRchMsg>,
+        mut rx_rch: rch::base::Receiver<VtepCtrlVtepRchMsg>,
+    ) -> Result<(), String> {
+        match rx_rch.recv().await {
+            Ok(Some(VtepCtrlVtepRchMsg::AddVniReq(req))) => self.add_vni(req, tx_rch).await,
+            Ok(Some(VtepCtrlVtepRchMsg::DelVniReq(req))) => self.del_vni(req, tx_rch).await,
+            Ok(None) => Err(format!("Received none rch")),
+            Err(e) => Err(format!("Receive error: {e}")),
+        }
+    }
+
     pub async fn run(&mut self) {
         if let Err(e) = self.wait().await {
             println!("Waiting BGP backend and source interface error: {e}");
@@ -275,6 +359,8 @@ impl Context {
             println!("Init neighs error: {e}");
             return;
         }
+
+        // RtnlHandler
         let mut rtnl_handler = RtnlHandler::new(
             self.src_ifname.clone(),
             self.src_ifindex,
@@ -283,6 +369,8 @@ impl Context {
         tokio::spawn(async move {
             rtnl_handler.run().await;
         });
+
+        // RrHandler
         for i in 0..2 {
             let (rr_tx_lch, rr_rx_lch) = mpsc::channel(1);
             let mut rr_handler = RrHandler::new(
@@ -299,8 +387,31 @@ impl Context {
             });
             self.rr_tx_lchs[i] = Some(rr_tx_lch);
         }
+
+        // UdsRchListener
+        let mut rch_listener = match UdsRchListener::new(self.rch_path.clone()).await {
+            Ok(rch_listener) => rch_listener,
+            Err(e) => {
+                println!("Rch listener new error: {e}");
+                return;
+            }
+        };
+        exec(vec!["chmod", "600", &self.rch_path]).await;
+
         loop {
             tokio::select! {
+                ret = rch_listener.rch_accept::<VtepVtepCtrlRchMsg, VtepCtrlVtepRchMsg>() => {
+                    match ret {
+                        Ok((tx_rch, rx_rch)) => {
+                            if let Err(e) = self.vtep_ctrl(tx_rch, rx_rch).await {
+                                println!("VTEP ctrl error: {e}");
+                            }
+                        }
+                        Err(e) => {
+                            println!("Rch accept error: {e}");
+                        }
+                    }
+                }
                 msg = self.rx_lch.recv() => {
                     if let Err(e) = self.lch(msg).await {
                         println!("lch error: {e}");
@@ -309,6 +420,7 @@ impl Context {
                 }
             };
         }
+
         println!("context exit");
     }
 }

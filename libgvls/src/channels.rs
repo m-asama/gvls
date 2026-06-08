@@ -11,11 +11,12 @@ use rustls::{
     client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier},
     pki_types::{CertificateDer, PrivateKeyDer, ServerName, UnixTime},
 };
-use tokio::net::{TcpListener, TcpSocket, TcpStream};
+use tokio::net::{TcpListener, TcpSocket, TcpStream, UnixListener, UnixSocket};
 use tokio_rustls::{TlsAcceptor, TlsConnector};
 
 pub const UI_RCH_PORT: u16 = 7101;
 pub const RR_RCH_PORT: u16 = 7102;
+pub const VTEP_RCH_PATH: &str = "/run/gvls-vtep.sock";
 
 pub const HELLO_INTERVAL: u64 = 15;
 pub const HELLO_TIMEOUT: u64 = 60;
@@ -68,12 +69,12 @@ impl ServerCertVerifier for NoCertificateVerification {
     }
 }
 
-pub struct RchListener {
+pub struct TlsRchListener {
     tcp_listener: TcpListener,
     tls_acceptor: TlsAcceptor,
 }
 
-impl RchListener {
+impl TlsRchListener {
     pub async fn new(addr: IpAddr, port: u16) -> Result<Self, String> {
         let cert = match generate_simple_self_signed(vec!["localhost".to_string()]) {
             Ok(cert) => cert,
@@ -122,6 +123,53 @@ impl RchListener {
         };
         tokio::spawn(conn);
         Ok((tx, rx, addr.ip()))
+    }
+}
+
+pub struct UdsRchListener {
+    unix_listener: UnixListener,
+}
+
+impl UdsRchListener {
+    pub async fn new(path: String) -> Result<Self, String> {
+        let sk = match UnixSocket::new_stream() {
+            Ok(sk) => sk,
+            Err(e) => return Err(format!("New stream error: {e}")),
+        };
+        if let Ok(res) = std::fs::exists(&path)
+            && res == true
+        {
+            // XXX: 乱暴。
+            let _ = std::fs::remove_file(&path);
+        }
+        if let Err(e) = sk.bind(path) {
+            return Err(format!("Bind error: {e}"));
+        }
+        let unix_listener = match sk.listen(2) {
+            Ok(unix_listener) => unix_listener,
+            Err(e) => return Err(format!("Listen error: {e}")),
+        };
+        Ok(Self {
+            unix_listener: unix_listener,
+        })
+    }
+    pub async fn rch_accept<
+        S: std::marker::Send + serde::Serialize + for<'de> serde::Deserialize<'de> + 'static,
+        R: std::marker::Send + serde::Serialize + for<'de> serde::Deserialize<'de> + 'static,
+    >(
+        &mut self,
+    ) -> Result<(rch::base::Sender<S>, rch::base::Receiver<R>), String> {
+        let (uds, _) = match self.unix_listener.accept().await {
+            Ok(uds) => uds,
+            Err(e) => return Err(format!("Listener accept error: {e}")),
+        };
+        let (uds_rx, uds_tx) = tokio::io::split(uds);
+        let (conn, tx, rx) = match remoc::Connect::io(remoc::Cfg::default(), uds_rx, uds_tx).await {
+            Ok((conn, tx, rx)) => (conn, tx, rx),
+            Err(e) => return Err(format!("remoc connect io failed: {e}")),
+        };
+        tokio::spawn(conn);
+        Ok((tx, rx))
     }
 }
 
@@ -214,4 +262,27 @@ pub async fn rch_connect_host<
     };
     tokio::spawn(conn);
     Ok((tx, rx, rem_addr))
+}
+
+pub async fn rch_connect_path<
+    S: std::marker::Send + serde::Serialize + for<'de> serde::Deserialize<'de> + 'static,
+    R: std::marker::Send + serde::Serialize + for<'de> serde::Deserialize<'de> + 'static,
+>(
+    path: String,
+) -> Result<(rch::base::Sender<S>, rch::base::Receiver<R>), String> {
+    let sk = match UnixSocket::new_stream() {
+        Ok(sk) => sk,
+        Err(e) => return Err(format!("New stream error: {e}")),
+    };
+    let stream = match sk.connect(path).await {
+        Ok(stream) => stream,
+        Err(e) => return Err(format!("Connect error: {e}")),
+    };
+    let (uds_rx, uds_tx) = tokio::io::split(stream);
+    let (conn, tx, rx) = match remoc::Connect::io(remoc::Cfg::default(), uds_rx, uds_tx).await {
+        Ok((conn, tx, rx)) => (conn, tx, rx),
+        Err(e) => return Err(format!("remoc connect io failed: {e}")),
+    };
+    tokio::spawn(conn);
+    Ok((tx, rx))
 }

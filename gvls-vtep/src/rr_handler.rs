@@ -9,7 +9,7 @@ use remoc::rch;
 use tokio::sync::mpsc;
 
 use libgvls::{
-    HELLO_INTERVAL, HELLO_TIMEOUT, HelloMsg, NeighsUpdatedMsg, RegisterVtepReqMsg, VtepRchMsg,
+    HELLO_INTERVAL, HELLO_TIMEOUT, HelloMsg, NeighsUpdatedMsg, RegisterVtepReqMsg, RrVtepRchMsg,
     VtepRrRchMsg, rch_connect_host,
 };
 
@@ -29,7 +29,7 @@ pub struct RrHandler {
     hello_next: Instant,
     hello_last: Instant,
     tx_rch: Option<rch::base::Sender<VtepRrRchMsg>>,
-    rx_rch: Option<rch::base::Receiver<VtepRchMsg>>,
+    rx_rch: Option<rch::base::Receiver<RrVtepRchMsg>>,
     tx_lch: mpsc::Sender<VtepLchMsg>,
     rx_lch: mpsc::Receiver<RrLchMsg>,
 }
@@ -129,7 +129,8 @@ impl RrHandler {
         let rr_port = self.rr_port;
         let loc_addr = &self.loc_addr.unwrap().clone();
         let (tx_rch, rx_rch, rem_addr) =
-            match rch_connect_host::<VtepRrRchMsg, VtepRchMsg>(rr_host, rr_port, *loc_addr).await {
+            match rch_connect_host::<VtepRrRchMsg, RrVtepRchMsg>(rr_host, rr_port, *loc_addr).await
+            {
                 Ok((tx_rch, rx_rch, rem_addr)) => (tx_rch, rx_rch, rem_addr),
                 Err(e) => {
                     println!("RR remoc connect ({}) failed: {e}", self.rr_host);
@@ -233,15 +234,15 @@ impl RrHandler {
 
     async fn rch(
         &mut self,
-        msg: Result<Option<VtepRchMsg>, rch::base::RecvError>,
+        msg: Result<Option<RrVtepRchMsg>, rch::base::RecvError>,
     ) -> Result<(), String> {
         match msg {
-            Ok(Some(VtepRchMsg::Hello(_))) => {
+            Ok(Some(RrVtepRchMsg::Hello(_))) => {
                 println!("Received hello {}", self.rr_host);
                 self.hello_last = Instant::now();
                 Ok(())
             }
-            Ok(Some(VtepRchMsg::NeighsUpdated(msg))) => self.neighs_updated(msg).await,
+            Ok(Some(RrVtepRchMsg::NeighsUpdated(msg))) => self.neighs_updated(msg).await,
             Ok(None) => Err(format!("Received none rch")),
             Err(e) => Err(format!("Receive error: {e}")),
         }

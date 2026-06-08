@@ -88,6 +88,31 @@ pub struct NeighsUpdatedMsg {
 
 //
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct AddVniReqMsg {
+    pub vni: u32,
+    pub ifname: String,
+}
+
+//
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct AddVniRepMsg {
+    pub result: Result<(), String>,
+}
+
+//
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct DelVniReqMsg {
+    pub vni: u32,
+}
+
+//
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct DelVniRepMsg {
+    pub result: Result<(), String>,
+}
+
+//
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub enum UiRchMsg {
     Hello(HelloMsg),
     RegisterRrReq(RegisterRrReqMsg),
@@ -114,7 +139,21 @@ pub enum VtepRrRchMsg {
 
 //
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub enum VtepRchMsg {
+pub enum RrVtepRchMsg {
     Hello(HelloMsg),
     NeighsUpdated(NeighsUpdatedMsg),
+}
+
+//
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub enum VtepCtrlVtepRchMsg {
+    AddVniReq(AddVniReqMsg),
+    DelVniReq(DelVniReqMsg),
+}
+
+//
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub enum VtepVtepCtrlRchMsg {
+    AddVniRep(AddVniRepMsg),
+    DelVniRep(DelVniRepMsg),
 }

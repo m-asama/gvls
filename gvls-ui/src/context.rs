@@ -14,7 +14,7 @@ use argon2::{
 };
 use tokio::sync::mpsc;
 
-use libgvls::{Account, Permission, RchListener, Rr, UiRchMsg, UiRrRchMsg, Vni, Vtep};
+use libgvls::{Account, Permission, Rr, TlsRchListener, UiRchMsg, UiRrRchMsg, Vni, Vtep};
 
 use crate::{
     AuthAccountRep, AuthAccountReq, AuthRrRep, AuthRrReq, ChangePasswordReq, Config,
@@ -990,7 +990,7 @@ impl Context {
             ui_handler.run().await;
         });
 
-        let mut rch_listener = match RchListener::new(self.rch_addr, self.rch_port).await {
+        let mut rch_listener = match TlsRchListener::new(self.rch_addr, self.rch_port).await {
             Ok(rch_listener) => rch_listener,
             Err(e) => {
                 println!("Rch listener new error: {e}");

@@ -1,4 +1,5 @@
 /gvls-ui/target
 /gvls-rr/target
 /gvls-vtep/target
+/gvls-vtep-ctrl/target
 /libgvls/target

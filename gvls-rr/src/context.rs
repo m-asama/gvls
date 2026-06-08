@@ -9,7 +9,7 @@ use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use tokio::sync::mpsc;
 use tokio::time::sleep;
 
-use libgvls::{BgpOps, RchListener, Vni, Vtep, VtepRchMsg, VtepRrRchMsg, get_ifindex};
+use libgvls::{BgpOps, RrVtepRchMsg, TlsRchListener, Vni, Vtep, VtepRrRchMsg, get_ifindex};
 
 use crate::{
     AddVniMsg, AddVtepMsg, AuthVtepRep, AuthVtepReq, Config, DelVniMsg, DelVtepMsg,
@@ -559,9 +559,9 @@ impl Context {
             ui_handler.run().await;
         });
 
-        // RchListener
+        // TlsRchListener
         let rch_addr = IpAddr::V6(self.rch_addr);
-        let mut rch_listener = match RchListener::new(rch_addr, self.rch_port).await {
+        let mut rch_listener = match TlsRchListener::new(rch_addr, self.rch_port).await {
             Ok(rch_listener) => rch_listener,
             Err(e) => {
                 println!("Rch listener new error: {e}");
@@ -571,7 +571,7 @@ impl Context {
 
         loop {
             tokio::select! {
-                ret = rch_listener.rch_accept::<VtepRchMsg, VtepRrRchMsg>() => {
+                ret = rch_listener.rch_accept::<RrVtepRchMsg, VtepRrRchMsg>() => {
                     match ret {
                         Ok((tx_rch, rx_rch, IpAddr::V6(addr))) => {
                             let (vtep_tx_lch, vtep_rx_lch) = mpsc::channel(1);

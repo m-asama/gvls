@@ -3,7 +3,7 @@
 
 use std::str::FromStr;
 
-use libgvls::{BgpOps, BgpOpsFrr, BgpOpsZebraRs, RR_RCH_PORT};
+use libgvls::{BgpOps, BgpOpsFrr, BgpOpsZebraRs, RR_RCH_PORT, VTEP_RCH_PATH};
 
 pub const DEFAULT_BGP_BACKEND: BgpOps = BgpOps::ZebraRs(BgpOpsZebraRs {});
 pub const DEFAULT_BGP_ASNUM: u32 = 64512;
@@ -17,6 +17,7 @@ pub fn usage() {
     println!("    --rr1-port <RR1_PORT>          gvls-rr #1 port (Default: {RR_RCH_PORT})");
     println!("    --rr2-host <RR2_HOST>          gvls-rr #2 host (Required)");
     println!("    --rr2-port <RR2_PORT>          gvls-rr #2 port (Default: {RR_RCH_PORT})");
+    println!("    --rch-path <RCH_PATH>          RCH path (Default: {VTEP_RCH_PATH})");
     println!("    --vni <VNI>:<IF_NAME>          VNI and interface name pair (Optional)");
     println!("    --bgp-backend (frr|zebra-rs)   BGP backend (Default: {DEFAULT_BGP_BACKEND})");
     println!("    --bgp-asnum <BGP_ASNUM>        BGP ASNUM (Default: {DEFAULT_BGP_ASNUM})");
@@ -30,6 +31,7 @@ pub struct Config {
     pub src_ifname: String,
     pub rr_hosts: [String; 2],
     pub rr_ports: [u16; 2],
+    pub rch_path: String,
     pub vnis: Vec<(u32, String)>,
     pub bgp_ops: BgpOps,
     pub bgp_asnum: u32,
@@ -43,6 +45,7 @@ impl Default for Config {
             src_ifname: String::new(),
             rr_hosts: [String::new(), String::new()],
             rr_ports: [RR_RCH_PORT, RR_RCH_PORT],
+            rch_path: VTEP_RCH_PATH.to_string(),
             vnis: Vec::<(u32, String)>::new(),
             bgp_ops: DEFAULT_BGP_BACKEND,
             bgp_asnum: DEFAULT_BGP_ASNUM,
@@ -104,6 +107,13 @@ impl Config {
                         Err(e) => return Err(format!("gvls-rr #2 port format error: {e}")),
                     };
                     conf.rr_ports[1] = rr2_port;
+                }
+                "--rch-path" => {
+                    let rch_path = match args.next() {
+                        Some(rch_path) => rch_path,
+                        None => return Err(format!("RCH path required")),
+                    };
+                    conf.rch_path = rch_path;
                 }
                 "--vni" => {
                     let vni_ifname_pair = match args.next() {

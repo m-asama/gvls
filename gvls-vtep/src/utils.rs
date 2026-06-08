@@ -13,7 +13,7 @@ fn vniname(vni: u32) -> String {
     format!("gvls-vni{vni}")
 }
 
-pub async fn init_vni(vni: u32, ifname: &str, local: &Option<Ipv6Addr>) -> Result<(), String> {
+pub async fn add_vni(vni: u32, ifname: &str, local: &Option<Ipv6Addr>) -> Result<(), String> {
     if !link_exists(ifname).await {
         return Err(format!("Link {ifname} not exists"));
     }
@@ -29,10 +29,10 @@ pub async fn init_vni(vni: u32, ifname: &str, local: &Option<Ipv6Addr>) -> Resul
     if !is_bridge(&brname).await {
         return Err(format!("Link {brname} is not bridge"));
     }
-    exec(vec!["ip", "link", "set", &brname, "up"]).await;
     sysctl(&format!("net.ipv4.conf.{brname}.forwarding=0")).await;
     sysctl(&format!("net.ipv6.conf.{brname}.forwarding=0")).await;
-    sysctl(&format!("net.ipv6.conf.{brname}.accept_ra=0")).await;
+    sysctl(&format!("net.ipv6.conf.{brname}.disable_ipv6=1")).await;
+    exec(vec!["ip", "link", "set", &brname, "up"]).await;
 
     // vni setup
     if link_exists(&vniname).await {
@@ -43,8 +43,24 @@ pub async fn init_vni(vni: u32, ifname: &str, local: &Option<Ipv6Addr>) -> Resul
     }
 
     // brport setup
+    sysctl(&format!("net.ipv6.conf.{ifname}.disable_ipv6=1")).await;
     exec(vec!["ip", "link", "set", ifname, "up"]).await;
     exec(vec!["ip", "link", "set", ifname, "master", &brname]).await;
+
+    Ok(())
+}
+
+pub async fn del_vni(vni: u32) -> Result<(), String> {
+    let brname = brname(vni);
+    let vniname = vniname(vni);
+
+    if link_exists(&vniname).await {
+        exec(vec!["ip", "link", "delete", &vniname]).await;
+    }
+
+    if link_exists(&brname).await {
+        exec(vec!["ip", "link", "delete", &brname]).await;
+    }
 
     Ok(())
 }
@@ -88,6 +104,7 @@ pub async fn update_vni(
             .concat(),
         )
         .await;
+        sysctl(&format!("net.ipv6.conf.{vniname}.disable_ipv6=1")).await;
         exec(vec!["ip", "link", "set", &vniname, "up"]).await;
     }
     Ok(())
