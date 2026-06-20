@@ -48,8 +48,8 @@ set router bgp neighbor {rem_addr} afi-safi evpn enabled true"
         if rr {
             self.exec(&format!(
                 "set router bgp neighbor {rem_addr} route-reflector client true
-set router bgp neighbor {rem_addr} policy in {rmname}
-set router bgp neighbor {rem_addr} policy out {rmname}"
+set router bgp neighbor {rem_addr} afi-safi evpn policy in {rmname}
+set router bgp neighbor {rem_addr} afi-safi evpn policy out {rmname}"
             ))
             .await;
         }
