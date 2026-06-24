@@ -85,7 +85,7 @@ impl RtnlHandler {
                     if let Some(addr) = parse_ipv6_addr(msg) {
                         println!("Local address appeared on {}: {}", self.src_ifname, addr);
                         self.loc_addr_candidates.insert(addr);
-                        if self.loc_addr_active.is_none() {
+                        if self.loc_addr_active != Some(addr.clone()) {
                             self.loc_addr_active = Some(addr.clone());
                             self.send_loc_addr_changed(Some(addr)).await;
                         }
