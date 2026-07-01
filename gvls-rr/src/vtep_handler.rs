@@ -162,6 +162,7 @@ impl VtepHandler {
         // RegisterVtepRep
         let (neigh_tx, neigh_rx) = rch::mpsc::channel(1);
         let rrep = RegisterVtepRepMsg {
+            vtep_id: lrep.vtep_id,
             bgp_pass: lrep.bgp_pass,
             neigh_rx: neigh_rx,
         };

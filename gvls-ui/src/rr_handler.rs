@@ -185,6 +185,7 @@ impl RrHandler {
         let (vtep_tx, vtep_rx) = rch::mpsc::channel(1);
         let (vni_tx, vni_rx) = rch::mpsc::channel(1);
         let rrep = RegisterRrRepMsg {
+            rr_id: lrep.rr_id,
             vtep_rx: vtep_rx,
             vni_rx: vni_rx,
         };

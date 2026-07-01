@@ -10,6 +10,7 @@ use libgvls::{Vni, Vtep};
 
 #[derive(Debug)]
 pub struct RrRegisteredMsg {
+    pub rr_id: i32,
     pub vteps: HashMap<String, Vtep>,
     pub vnis: HashMap<i32, Vni>,
 }
@@ -30,6 +31,7 @@ pub struct AuthVtepReq {
 #[derive(Debug)]
 pub struct AuthVtepRep {
     pub vtep_name: Result<String, String>,
+    pub vtep_id: i32,
     pub bgp_pass: String,
     pub neighs: HashSet<Ipv6Addr>,
 }

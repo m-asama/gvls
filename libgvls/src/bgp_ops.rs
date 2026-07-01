@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 use std::fmt::{Display, Error, Formatter};
-use std::net::Ipv6Addr;
+use std::net::{Ipv4Addr, Ipv6Addr};
 
 use crate::{BgpOpsFrr, BgpOpsZebraRs};
 
@@ -78,6 +78,13 @@ impl BgpOps {
         match self {
             BgpOps::Frr(bgp_ops) => bgp_ops.del_route_map(name).await,
             BgpOps::ZebraRs(bgp_ops) => bgp_ops.del_route_map(name).await,
+        }
+    }
+
+    pub async fn set_router_id(&self, asnum: u32, router_id: Ipv4Addr) {
+        match self {
+            BgpOps::Frr(bgp_ops) => bgp_ops.set_router_id(asnum, router_id).await,
+            BgpOps::ZebraRs(bgp_ops) => bgp_ops.set_router_id(asnum, router_id).await,
         }
     }
 

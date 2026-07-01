@@ -6,6 +6,7 @@ use std::net::Ipv6Addr;
 
 #[derive(Debug, Clone)]
 pub struct VtepRegisteredMsg {
+    pub vtep_id: i32,
     pub rr_index: usize,
     pub bgp_pass: String,
     pub neighs: HashSet<Ipv6Addr>,

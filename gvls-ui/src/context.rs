@@ -220,6 +220,7 @@ impl Context {
 
     async fn auth_rr(&mut self, msg: AuthRrReq) -> Result<(), String> {
         let mut rr_name: Result<String, String> = Err("Auth failed".to_string());
+        let mut rr_id = -1;
         if let Some(rr) = self.rrs.get(&msg.name) {
             if let Ok(parsed_hash) = PasswordHash::new(&rr.password) {
                 if Argon2::default()
@@ -227,6 +228,7 @@ impl Context {
                     .is_ok()
                 {
                     rr_name = Ok(rr.name.clone());
+                    rr_id = rr.id;
                 }
             }
         }
@@ -249,6 +251,7 @@ impl Context {
             .rep_tx
             .send(AuthRrRep {
                 rr_name,
+                rr_id,
                 vteps,
                 vnis,
             })

@@ -177,6 +177,7 @@ impl RrHandler {
             }
         };
         println!("Received RegisterVtepRep from RR ({})", self.rr_host);
+        let vtep_id = rep.vtep_id;
         let mut neighs = HashSet::<Ipv6Addr>::new();
         while let Ok(Some(neigh)) = rep.neigh_rx.recv().await {
             neighs.insert(neigh);
@@ -186,6 +187,7 @@ impl RrHandler {
 
         // VtepRegistered
         let msg = VtepLchMsg::VtepRegistered(VtepRegisteredMsg {
+            vtep_id: vtep_id,
             rr_index: self.rr_index,
             bgp_pass,
             neighs: neighs,

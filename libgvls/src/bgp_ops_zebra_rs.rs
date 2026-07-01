@@ -2,7 +2,7 @@
 // Copyright(c) 2026 Masakazu Asama
 
 use std::collections::HashSet;
-use std::net::Ipv6Addr;
+use std::net::{Ipv4Addr, Ipv6Addr};
 
 use tokio::process::Command;
 
@@ -100,6 +100,11 @@ set policy {rmname} entry {i} action permit
     pub async fn del_route_map(&self, name: &String) {
         let rmname = format!("{ROUTE_MAP_PREFIX}-{name}");
         self.exec(&format!("delete policy {rmname}")).await;
+    }
+
+    pub async fn set_router_id(&self, _asnum: u32, router_id: Ipv4Addr) {
+        self.exec(&format!("set router bgp global router-id {router_id}"))
+            .await;
     }
 
     pub async fn init(&self, asnum: u32) {

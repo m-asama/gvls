@@ -20,6 +20,7 @@ use crate::{
 
 #[derive(Debug)]
 pub struct Context {
+    rr_id: i32,
     rr_name: String,
     rr_pass: String,
     src_ifname: String,
@@ -55,6 +56,7 @@ impl Context {
         }
         let (tx_lch, rx_lch) = mpsc::channel(1);
         Ok(Self {
+            rr_id: -1,
             rr_name: conf.rr_name,
             rr_pass: conf.rr_pass,
             src_ifname: conf.src_ifname,
@@ -76,6 +78,17 @@ impl Context {
             ui_tx_lch: None,
             vtep_tx_lchs: HashMap::<Ipv6Addr, mpsc::Sender<VtepLchMsg>>::new(),
         })
+    }
+
+    fn router_id(&self) -> Ipv4Addr {
+        let bits: u32 = if self.rr_id > 0 {
+            let bits: u32 = self.rr_id as u32 & 0x0fffffffu32;
+            0xac100000u32 | bits
+        } else {
+            let bits: u32 = rand::random_range(0..0x10000);
+            0xa9fe0000u32 | bits
+        };
+        Ipv4Addr::from_bits(bits)
     }
 
     async fn init_src_ifindex(&mut self) -> Result<(), String> {
@@ -206,6 +219,12 @@ impl Context {
             msg.vteps.len(),
             msg.vnis.len()
         );
+        if msg.rr_id != self.rr_id {
+            self.rr_id = msg.rr_id;
+            self.bgp_ops
+                .set_router_id(self.bgp_asnum, self.router_id())
+                .await;
+        }
         let mut vteps = msg.vteps;
         let vnis = msg.vnis;
         for (name, new) in &mut vteps {
@@ -266,6 +285,7 @@ impl Context {
     async fn auth_vtep(&mut self, msg: AuthVtepReq) -> Result<(), String> {
         println!("Authenticating VTEP {} from {}", msg.name, msg.rem_addr);
         let mut vtep_name: Result<String, String> = Err(format!("Auth failed"));
+        let mut vtep_id = -1;
         let mut bgp_pass = String::new();
         let mut neighs = HashSet::<Ipv6Addr>::new();
         if let Some(vtep) = self.vteps.get(&msg.name) {
@@ -275,6 +295,7 @@ impl Context {
                     .is_ok()
                 {
                     vtep_name = Ok(vtep.name.clone());
+                    vtep_id = vtep.id;
                     bgp_pass = vtep.bgp_pass.clone();
                 }
             }
@@ -293,6 +314,7 @@ impl Context {
             .rep_tx
             .send(AuthVtepRep {
                 vtep_name: vtep_name,
+                vtep_id,
                 bgp_pass,
                 neighs: neighs,
             })

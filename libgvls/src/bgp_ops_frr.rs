@@ -2,7 +2,7 @@
 // Copyright(c) 2026 Masakazu Asama
 
 use std::collections::HashSet;
-use std::net::Ipv6Addr;
+use std::net::{Ipv4Addr, Ipv6Addr};
 
 use tokio::process::Command;
 
@@ -184,6 +184,21 @@ impl BgpOpsFrr {
             .await
         {
             println!("Delete route map error: {e}");
+        }
+    }
+
+    pub async fn set_router_id(&self, asnum: u32, router_id: Ipv4Addr) {
+        if let Err(e) = Command::new("vtysh")
+            .arg("-c")
+            .arg("configure terminal")
+            .arg("-c")
+            .arg(format!("router bgp {asnum}"))
+            .arg("-c")
+            .arg(format!("bgp router-id {router_id}"))
+            .output()
+            .await
+        {
+            println!("Set router-id error: {e}");
         }
     }
 

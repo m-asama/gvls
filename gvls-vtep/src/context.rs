@@ -2,7 +2,7 @@
 // Copyright(c) 2026 Masakazu Asama
 
 use std::collections::HashSet;
-use std::net::Ipv6Addr;
+use std::net::{Ipv4Addr, Ipv6Addr};
 use std::time::Duration;
 
 use remoc::rch;
@@ -22,6 +22,7 @@ use crate::{
 
 #[derive(Debug)]
 pub struct Context {
+    vtep_id: i32,
     vtep_name: String,
     vtep_pass: String,
     src_ifname: String,
@@ -54,6 +55,7 @@ impl Context {
         }
         let (tx_lch, rx_lch) = mpsc::channel(1);
         Ok(Self {
+            vtep_id: -1,
             vtep_name: conf.vtep_name,
             vtep_pass: conf.vtep_pass,
             src_ifname: conf.src_ifname,
@@ -75,6 +77,17 @@ impl Context {
             rx_lch,
             rr_tx_lchs: [None, None],
         })
+    }
+
+    fn router_id(&self) -> Ipv4Addr {
+        let bits: u32 = if self.vtep_id > 0 {
+            let bits: u32 = self.vtep_id as u32 & 0x00ffffffu32;
+            0x0a000000u32 | bits
+        } else {
+            let bits: u32 = rand::random_range(0..0x10000);
+            0xa9fe0000u32 | bits
+        };
+        Ipv4Addr::from_bits(bits)
     }
 
     async fn init_src_ifindex(&mut self) -> Result<(), String> {
@@ -137,6 +150,12 @@ impl Context {
             msg.rr_index + 1,
             msg.neighs.len()
         );
+        if msg.vtep_id != self.vtep_id {
+            self.vtep_id = msg.vtep_id;
+            self.bgp_ops
+                .set_router_id(self.bgp_asnum, self.router_id())
+                .await;
+        }
         self.bgp_pass[msg.rr_index] = msg.bgp_pass;
         self.neighs_allowed_by_rr[msg.rr_index] = msg.neighs;
         if let Err(e) = self.sync_neighs().await {

@@ -22,6 +22,7 @@ pub struct RegisterRrReqMsg {
 //
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct RegisterRrRepMsg {
+    pub rr_id: i32,
     pub vtep_rx: rch::mpsc::Receiver<Vtep>,
     pub vni_rx: rch::mpsc::Receiver<Vni>,
 }
@@ -37,6 +38,7 @@ pub struct RegisterVtepReqMsg {
 //
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct RegisterVtepRepMsg {
+    pub vtep_id: i32,
     pub bgp_pass: String,
     pub neigh_rx: rch::mpsc::Receiver<Ipv6Addr>,
 }

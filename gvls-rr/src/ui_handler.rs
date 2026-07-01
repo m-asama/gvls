@@ -163,6 +163,7 @@ impl UiHandler {
             }
         };
         println!("Received RegisterRrRep from gvls-ui ({})", self.ui_addr);
+        let rr_id = rep.rr_id;
         let mut vteps = HashMap::<String, Vtep>::new();
         while let Ok(Some(vtep)) = rep.vtep_rx.recv().await {
             vteps.insert(vtep.name.clone(), vtep);
@@ -174,7 +175,7 @@ impl UiHandler {
         drop(rep);
 
         // RrRegistered
-        let msg = RrLchMsg::RrRegistered(RrRegisteredMsg { vteps, vnis });
+        let msg = RrLchMsg::RrRegistered(RrRegisteredMsg { rr_id, vteps, vnis });
         if let Err(e) = self.tx_lch.send(msg).await {
             println!("Send RrRegistered to context failed: {e}");
             self.retry();

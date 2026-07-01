@@ -42,6 +42,7 @@ pub struct AuthRrReq {
 #[derive(Debug)]
 pub struct AuthRrRep {
     pub rr_name: Result<String, String>,
+    pub rr_id: i32,
     pub vteps: Vec<Vtep>,
     pub vnis: Vec<Vni>,
 }
