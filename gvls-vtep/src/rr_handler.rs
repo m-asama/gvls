@@ -85,7 +85,7 @@ impl RrHandler {
     async fn send_rem_addr_changed(&mut self, rem_addr: Option<Ipv6Addr>) {
         let msg = VtepLchMsg::RemAddrChanged(RemAddrChangedMsg {
             rr_index: self.rr_index,
-            rem_addr: rem_addr,
+            rem_addr,
         });
         let _ = self.tx_lch.send(msg).await;
     }
@@ -187,10 +187,10 @@ impl RrHandler {
 
         // VtepRegistered
         let msg = VtepLchMsg::VtepRegistered(VtepRegisteredMsg {
-            vtep_id: vtep_id,
+            vtep_id,
             rr_index: self.rr_index,
             bgp_pass,
-            neighs: neighs,
+            neighs,
         });
         if let Err(e) = self.tx_lch.send(msg).await {
             println!(
@@ -212,7 +212,7 @@ impl RrHandler {
         }
         let msg = VtepLchMsg::UpdateNeighs(UpdateNeighsMsg {
             rr_index: self.rr_index,
-            neighs: neighs,
+            neighs,
         });
         if let Err(e) = self.tx_lch.send(msg).await {
             println!(

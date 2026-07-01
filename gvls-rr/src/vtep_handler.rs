@@ -75,7 +75,7 @@ impl VtepHandler {
             return Ok(());
         }
         let (neigh_tx, neigh_rx) = rch::mpsc::channel(1);
-        let rmsg = RrVtepRchMsg::NeighsUpdated(NeighsUpdatedMsg { neigh_rx: neigh_rx });
+        let rmsg = RrVtepRchMsg::NeighsUpdated(NeighsUpdatedMsg { neigh_rx });
         if let Err(e) = self.tx_rch.send(rmsg).await {
             println!("Send neighs updated {} {} error: {e}", self.name, self.addr);
         }
@@ -164,7 +164,7 @@ impl VtepHandler {
         let rrep = RegisterVtepRepMsg {
             vtep_id: lrep.vtep_id,
             bgp_pass: lrep.bgp_pass,
-            neigh_rx: neigh_rx,
+            neigh_rx,
         };
         if let Err(e) = rreq.rep_tx.send(rrep).await {
             println!("Send rch error: {e}");

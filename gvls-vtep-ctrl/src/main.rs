@@ -38,10 +38,7 @@ async fn add_vni(path: String, args: Vec<String>) {
         }
     };
     let ifname = args[2].clone();
-    let req = VtepCtrlVtepRchMsg::AddVniReq(AddVniReqMsg {
-        vni: vni,
-        ifname: ifname,
-    });
+    let req = VtepCtrlVtepRchMsg::AddVniReq(AddVniReqMsg { vni, ifname });
     if let Err(e) = tx_rch.send(req).await {
         println!("Rch send error: {e}");
         return;
@@ -82,7 +79,7 @@ async fn del_vni(path: String, args: Vec<String>) {
             return;
         }
     };
-    let req = VtepCtrlVtepRchMsg::DelVniReq(DelVniReqMsg { vni: vni });
+    let req = VtepCtrlVtepRchMsg::DelVniReq(DelVniReqMsg { vni });
     if let Err(e) = tx_rch.send(req).await {
         println!("Rch send error: {e}");
         return;

@@ -54,7 +54,7 @@ impl RtnlHandler {
         self.loc_addr_candidates = loc_addr_candidates;
     }
     async fn send_loc_addr_changed(&mut self, loc_addr: Option<Ipv6Addr>) {
-        let msg = RrLchMsg::LocAddrChanged(LocAddrChangedMsg { loc_addr: loc_addr });
+        let msg = RrLchMsg::LocAddrChanged(LocAddrChangedMsg { loc_addr });
         let _ = self.tx_lch.send(msg).await;
     }
     pub async fn run(&mut self) {

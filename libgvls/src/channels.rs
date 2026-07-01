@@ -98,8 +98,8 @@ impl TlsRchListener {
         };
         let tls_acceptor = TlsAcceptor::from(Arc::new(server_cfg));
         Ok(Self {
-            tcp_listener: tcp_listener,
-            tls_acceptor: tls_acceptor,
+            tcp_listener,
+            tls_acceptor,
         })
     }
     pub async fn rch_accept<
@@ -149,9 +149,7 @@ impl UdsRchListener {
             Ok(unix_listener) => unix_listener,
             Err(e) => return Err(format!("Listen error: {e}")),
         };
-        Ok(Self {
-            unix_listener: unix_listener,
-        })
+        Ok(Self { unix_listener })
     }
     pub async fn rch_accept<
         S: std::marker::Send + serde::Serialize + for<'de> serde::Deserialize<'de> + 'static,

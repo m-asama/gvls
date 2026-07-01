@@ -38,8 +38,8 @@ impl RrHandler {
             name: String::new(),
             hello_next: Instant::now(),
             hello_last: Instant::now(),
-            tx_rch: tx_rch,
-            rx_rch: rx_rch,
+            tx_rch,
+            rx_rch,
             tx_lch,
             rx_lch,
         }
@@ -186,8 +186,8 @@ impl RrHandler {
         let (vni_tx, vni_rx) = rch::mpsc::channel(1);
         let rrep = RegisterRrRepMsg {
             rr_id: lrep.rr_id,
-            vtep_rx: vtep_rx,
-            vni_rx: vni_rx,
+            vtep_rx,
+            vni_rx,
         };
         if let Err(e) = rreq.rep_tx.send(rrep).await {
             println!("Send rch error: {e}");

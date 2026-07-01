@@ -313,10 +313,10 @@ impl Context {
         if let Err(e) = msg
             .rep_tx
             .send(AuthVtepRep {
-                vtep_name: vtep_name,
+                vtep_name,
                 vtep_id,
                 bgp_pass,
-                neighs: neighs,
+                neighs,
             })
             .await
         {
